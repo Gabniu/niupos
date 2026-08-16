@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nova-api
+  labels:
+    app.kubernetes.io/name: nova-api
+    app.kubernetes.io/part-of: nova-pos
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: {maxUnavailable: 0, maxSurge: 1}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nova-api
+      app.kubernetes.io/part-of: nova-pos
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nova-api
+        app.kubernetes.io/part-of: nova-pos
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: api
+          image: nova-pos/api:dev
+          imagePullPolicy: IfNotPresent
+          ports:
+            - {name: http, containerPort: 8080}
+          envFrom:
+            - configMapRef: {name: nova-api-config}
+            - secretRef: {name: nova-api-secrets}
+          readinessProbe:
+            tcpSocket: {port: http}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: {port: http}
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 512Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+            - {name: framework-cache, mountPath: /app/storage/framework}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: framework-cache
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nova-api
+spec:
+  selector:
+    app.kubernetes.io/name: nova-api
+    app.kubernetes.io/part-of: nova-pos
+  ports:
+    - {name: http, port: 8080, targetPort: http}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: nova-api
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nova-api
+      app.kubernetes.io/part-of: nova-pos

@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nova-pos.local/contracts/sync/v1",
+  "title": "NOVA Offline Synchronization Protocol v1",
+  "oneOf": [
+    { "$ref": "#/$defs/command" },
+    { "$ref": "#/$defs/receipt" },
+    { "$ref": "#/$defs/changePage" }
+    ,{ "$ref": "#/$defs/bootstrap" }
+  ],
+  "$defs": {
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "commandId", "type", "occurredAt", "payload"],
+      "properties": {
+        "version": { "const": "1" },
+        "commandId": { "type": "string", "format": "uuid" },
+        "type": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z0-9]+(?:[._-][a-z0-9]+)*$" },
+        "occurredAt": { "type": "string", "format": "date-time" },
+        "payload": { "type": "object" }
+      }
+    },
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commandId", "status", "attempts"],
+      "properties": {
+        "commandId": { "type": "string", "format": "uuid" },
+        "status": { "enum": ["applied", "rejected", "conflict", "retry_pending"] },
+        "attempts": { "type": "integer", "minimum": 1 },
+        "resultCode": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "resultMessage": { "type": "string", "minLength": 1, "maxLength": 500 }
+      }
+    },
+    "change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cursor", "entityType", "entityId", "operation", "payload", "occurredAt"],
+      "properties": {
+        "cursor": { "type": "integer", "minimum": 1 },
+        "entityType": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "entityId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "operation": { "enum": ["upsert", "delete"] },
+        "payload": { "type": "object" },
+        "occurredAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "changePage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "cursor", "changes", "hasMore"],
+      "properties": {
+        "version": { "const": "1" },
+        "cursor": { "type": "integer", "minimum": 0 },
+        "changes": { "type": "array", "maxItems": 500, "items": { "$ref": "#/$defs/change" } },
+        "hasMore": { "type": "boolean" }
+      }
+    },
+    "bootstrap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "cursor", "generatedAt", "catalogue", "pricing"],
+      "properties": {
+        "version": { "const": "1" },
+        "cursor": { "type": "integer", "minimum": 0 },
+        "generatedAt": { "type": "string", "format": "date-time" },
+        "catalogue": { "type": "object" },
+        "pricing": { "type": "object" }
+      }
+    }
+  }
+}

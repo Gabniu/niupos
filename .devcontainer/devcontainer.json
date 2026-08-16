@@ -1,0 +1,21 @@
+{
+  "name": "NOVA POS",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "24.12.0"
+    }
+  },
+  "remoteUser": "root",
+  "postCreateCommand": "npm ci && composer --working-dir=apps/api install --no-interaction --prefer-dist",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "bmewburn.vscode-intelephense-client",
+        "dbaeumer.vscode-eslint"
+      ]
+    }
+  }
+}

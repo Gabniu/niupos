@@ -1,0 +1,49 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  /* NIU POS uses black/charcoal to differentiate the operational product
+     from NIU Auth/Identity emerald. Existing emerald-* utility classes
+     intentionally resolve through these tokens across the POS pages. */
+  --color-emerald-50: #fafafa;
+  --color-emerald-100: #f4f4f5;
+  --color-emerald-200: #e4e4e7;
+  --color-emerald-300: #d4d4d8;
+  --color-emerald-400: #a1a1aa;
+  --color-emerald-500: #71717a;
+  --color-emerald-600: #27272a;
+  --color-emerald-700: #18181b;
+  --color-emerald-800: #09090b;
+  --color-emerald-900: #000000;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-hanken);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-hanken), sans-serif;
+  filter: none;
+  opacity: 1;
+}
+
+/* The POS entry screen is intentionally light. Keep browser dark-mode
+   preferences and stale shell styles from applying a document-wide veil. */
+html,
+body {
+  background-color: #f7f9fd;
+  color-scheme: light;
+}

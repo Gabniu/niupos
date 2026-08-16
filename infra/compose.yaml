@@ -1,0 +1,100 @@
+# Backing services for NOVA POS (PostgreSQL, Redis, RabbitMQ, Elasticsearch).
+#
+# WHY EVERY PORT CARRIES AN EXPLICIT INTERFACE
+# --------------------------------------------
+# A bare "5432:5432" binds 0.0.0.0 -- every interface, including the public IP
+# of any host this runs on. This file previously did that for all four
+# services, which on a public server publishes an unauthenticated Redis and a
+# security-disabled Elasticsearch to the internet. Redis on 6379 is among the
+# most-scanned ports there is, so that is not a theoretical exposure.
+#
+# The default below is 127.0.0.1, so containers and host tooling reach these
+# exactly as before while nothing outside the machine can. Anything that needs
+# to be public belongs behind the reverse proxy (see infra/reverse-proxy/),
+# never bound directly.
+#
+# NOVA_BIND exists as an escape hatch for the rare case of a genuinely private
+# network interface. Do not set it to 0.0.0.0 on an internet-facing host.
+#
+# The passwords default to the historic local values so `npm run infra:up`
+# behaves identically on a development machine. On any shared or deployed host,
+# set the NOVA_*_PASSWORD variables -- a loopback bind is defence in depth, not
+# a licence to keep a password that is literally named "local only".
+
+name: nova-pos
+
+services:
+  postgres:
+    image: postgres:17.6-alpine
+    environment:
+      POSTGRES_DB: nova
+      POSTGRES_USER: nova
+      POSTGRES_PASSWORD: ${NOVA_PG_PASSWORD:-nova-local-only}
+    ports:
+      - "${NOVA_BIND:-127.0.0.1}:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nova -d nova"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:8.8.0-alpine
+    command: ["redis-server", "--appendonly", "no", "--save", ""]
+    ports:
+      - "${NOVA_BIND:-127.0.0.1}:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  rabbitmq:
+    image: rabbitmq:4.3.4-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: nova
+      RABBITMQ_DEFAULT_PASS: ${NOVA_RABBITMQ_PASSWORD:-nova-local-only}
+    ports:
+      # 5672 is AMQP; 15672 is the management UI, which is a full admin console
+      # with a default login -- it must never be reachable from outside.
+      - "${NOVA_BIND:-127.0.0.1}:5672:5672"
+      - "${NOVA_BIND:-127.0.0.1}:15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.19.6
+    environment:
+      discovery.type: single-node
+      # Security is off because this is a development instance reachable only
+      # on loopback. That pairing is the whole justification -- if this is ever
+      # published beyond the host, security must be enabled first.
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    ports:
+      - "${NOVA_BIND:-127.0.0.1}:9200:9200"
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+# Pinned rather than left to Docker's automatic pool. On a host shared with
+# other compose projects the pool hands out /16 blocks from 172.17.0.0/12, and
+# a neighbouring stack may already have pinned a subnet inside that range --
+# the voice platform on the shared deployment host pins 172.30.0.0/24. Docker
+# does avoid subnets it can see, so this is insurance rather than a live bug,
+# but declaring it means the allocation is never a question.
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24
+
+volumes:
+  postgres-data:

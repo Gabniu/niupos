@@ -1,0 +1,11 @@
+groups:
+  - name: platform-availability
+    rules:
+      - alert: PrometheusTargetUnavailable
+        expr: up == 0
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: Prometheus scrape target unavailable
+          description: "{{ $labels.job }} target {{ $labels.instance }} has been unavailable for five minutes."
+

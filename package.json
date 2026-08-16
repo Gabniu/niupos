@@ -1,0 +1,21 @@
+{
+  "name": "nova-pos",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Offline-first, multi-tenant retail POS platform",
+  "workspaces": [
+    "apps/auth",
+    "apps/web",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "test": "node --test tests/**/*.test.mjs",
+    "test:architecture": "node --test tests/architecture/*.test.mjs",
+    "infra:config": "docker compose -f infra/compose.yaml config --quiet",
+    "infra:up": "docker compose -f infra/compose.yaml up -d --wait",
+    "infra:down": "docker compose -f infra/compose.yaml down"
+  }
+}

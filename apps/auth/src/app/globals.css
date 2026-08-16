@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-hanken);
+}
+
+* { box-sizing: border-box; }
+html { background: #f6f8fb; }
+body { margin: 0; font-family: var(--font-hanken), sans-serif; }
+button, input, select, textarea { font: inherit; }
+button, a { -webkit-tap-highlight-color: transparent; }
+::selection { background: #a7f3d0; color: #052e2b; }
+
+/* Auth rail refinements: compact labels and a clearly destructive sign-out action. */
+@media (min-width: 1024px) {
+  aside nav a { font-size: 13px !important; }
+  aside > div:last-child button { border-color: rgb(248 113 113 / 0.7); color: rgb(248 113 113); }
+  aside > div:last-child button:hover { background: rgb(127 29 29 / 0.28); color: rgb(254 202 202); }
+}
+
+/* Sign-out is destructive: keep it red in the light profile menu too. */
+div[role="menu"] button { color: rgb(220 38 38); }
+div[role="menu"] button:hover { background: rgb(254 242 242); color: rgb(185 28 28); }

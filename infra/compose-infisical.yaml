@@ -1,0 +1,67 @@
+# Private NOVA secret storage. This stack intentionally shares the existing
+# nova-auth_default network so only the Auth container can reach the backend.
+# The UI is bound to 127.0.0.1:3005 for one-time infrastructure bootstrap via
+# an SSH tunnel; it is not a public application endpoint.
+name: nova-infisical
+
+services:
+  backend:
+    image: infisical/infisical:v0.151.0
+    env_file:
+      - .env.infisical
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    expose:
+      - "8080"
+    ports:
+      - "127.0.0.1:3005:8080"
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - auth
+
+  db:
+    image: postgres:17.6-alpine
+    environment:
+      POSTGRES_DB: infisical
+      POSTGRES_USER: infisical_owner
+      POSTGRES_PASSWORD: ${INFISICAL_DB_PASSWORD:?INFISICAL_DB_PASSWORD is required}
+    volumes:
+      - infisical-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U infisical_owner -d infisical"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    networks:
+      - auth
+
+  redis:
+    image: redis:7.4-alpine
+    environment:
+      REDIS_PASSWORD: ${INFISICAL_REDIS_PASSWORD:?INFISICAL_REDIS_PASSWORD is required}
+    command: ["redis-server", "--requirepass", "${INFISICAL_REDIS_PASSWORD:?INFISICAL_REDIS_PASSWORD is required}"]
+    volumes:
+      - infisical-redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    networks:
+      - auth
+
+networks:
+  auth:
+    external: true
+    name: nova-auth_default
+
+volumes:
+  infisical-postgres-data:
+  infisical-redis-data:

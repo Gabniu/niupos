@@ -1,0 +1,162 @@
+# Deployable stack for NOVA POS (web + API + database) -- serves
+# pos.niuautomations.com.
+#
+# Companion to infra/compose-auth.yaml and follows the same shape: the service
+# binds loopback only and a host reverse proxy owns TLS and the public
+# hostname. See infra/reverse-proxy/novapos-api.nginx.example.conf.
+#
+# NOT the same file as infra/compose.yaml. That one is the shared development
+# backing services (Redis, RabbitMQ, Elasticsearch and a general-purpose
+# Postgres). This one is the deployed API and the database it owns, so the test
+# environment can be torn down and rebuilt without touching anything else.
+#
+#   docker compose -f infra/compose-pos.yaml up -d --build
+#
+# FIRST RUN, in order -- the middle step is easy to miss and the app will not
+# start without it:
+#
+#   1. cp apps/api/.env.production.example <deployment env file>   and fill it
+#   2. docker compose -f infra/compose-pos.yaml run --rm api \
+#          php artisan key:generate --show          -> paste into APP_KEY
+#   3. docker compose -f infra/compose-pos.yaml up -d --build
+#   4. run the migrations as the OWNER role, not the runtime role:
+#          docker compose -f infra/compose-pos.yaml exec \
+#              -e DB_USERNAME=nova_owner -e DB_PASSWORD=<owner password> \
+#              api php artisan migrate --force
+#
+# Step 4 is deliberate rather than automatic. The API connects as nova_app,
+# which by design cannot create or alter tables -- that is what makes row-level
+# security apply to it (see infra/docker/api/initdb/10-app-role.sql). So
+# migrations must be run explicitly with the owner's credentials, and
+# NOVA_RUN_MIGRATIONS stays false here.
+
+name: nova-api
+
+services:
+  # The front end, and the ONLY service the reverse proxy talks to.
+  #
+  # Next rewrites /api/v1/* to the api service over the compose network
+  # (apps/web/next.config.ts), so the browser sees a single origin. That means
+  # no CORS configuration, no preflight round-trip before every API call, and
+  # no second public hostname to certificate. The api service stays published
+  # on loopback for migrations and debugging, not for browsers.
+  web:
+    build:
+      context: ..
+      dockerfile: infra/docker/web/Dockerfile
+    # NOVA_API_ORIGIN is deliberately NOT set here. Next bakes its rewrite
+    # destinations into the image at build time, so setting it at runtime does
+    # nothing -- it looks like it works and then every API call fails with
+    # ECONNREFUSED to the build-time default. The reverse proxy routes /api/
+    # to the API container instead; see infra/reverse-proxy/.
+    ports:
+      - "127.0.0.1:3011:3011"
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+
+  api:
+    build:
+      context: ..
+      dockerfile: infra/docker/api/Dockerfile
+    env_file:
+      - ../apps/api/.env.production
+    environment:
+      # Set here rather than left to the env file so a copied development file
+      # cannot quietly turn debug on for a host that has a public hostname.
+      # The entrypoint refuses to start on the combination anyway; this stops
+      # it getting that far.
+      APP_ENV: production
+      APP_DEBUG: "false"
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_DATABASE: nova
+      # The restricted runtime role. Changing this to the owner would make
+      # every RLS policy inert -- read the initdb script before you do.
+      DB_USERNAME: nova_app
+      DB_PASSWORD: ${NOVA_APP_DB_PASSWORD:-nova-app-local-only}
+      NOVA_RUN_MIGRATIONS: "false"
+    ports:
+      # Loopback only. 3010 keeps the NOVA range contiguous with auth on 3004
+      # and clear of the voice platform's 8000-8099 and its loopback services.
+      - "127.0.0.1:3010:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    # The application writes only to storage/ and bootstrap/cache, both of
+    # which are tmpfs below. Everything else being read-only means a code
+    # execution bug cannot persist a web shell into the source tree -- it
+    # would not survive a restart, and it cannot be written in the first place.
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run
+      - /var/lib/nginx
+      - /var/log/nginx
+      # Compiled Blade views, the config cache and the route cache. tmpfs is
+      # correct for these specifically: the entrypoint rebuilds all three on
+      # every start, so persisting them would only risk serving a cache built
+      # from a previous image.
+      - /var/www/html/bootstrap/cache
+    volumes:
+      # storage/ is a named volume, NOT tmpfs.
+      #
+      # FILESYSTEM_DISK=local writes uploads to storage/app, and those are real
+      # artifacts -- losing them on a restart is data loss, not a cleared
+      # cache. The whole tree is mounted rather than storage/app alone because
+      # mounting only part of it leaves the rest on the read-only image layer,
+      # which broke the entrypoint's chown (it recursed into a read-only
+      # subtree and aborted under `set -e`).
+      #
+      # storage/framework and storage/logs live inside this volume as a
+      # consequence. That is harmless: the framework caches are rebuilt on
+      # every start regardless, and logs go to stdout rather than
+      # storage/logs.
+      - api-storage:/var/www/html/storage
+    security_opt:
+      - no-new-privileges:true
+
+  postgres:
+    image: postgres:17.6-alpine
+    environment:
+      POSTGRES_DB: nova
+      # The OWNER role. Migrations run as this; the application does not.
+      POSTGRES_USER: nova_owner
+      POSTGRES_PASSWORD: ${NOVA_OWNER_DB_PASSWORD:-nova-owner-local-only}
+      # Read by the initdb script, which creates the nova_app role. Must match
+      # the api service's DB_PASSWORD above -- they are the same credential
+      # seen from the two ends. Only consumed on first initialisation of an
+      # empty volume; changing it later requires an ALTER ROLE, not a restart.
+      NOVA_APP_DB_PASSWORD: ${NOVA_APP_DB_PASSWORD:-nova-app-local-only}
+    volumes:
+      - api-postgres-data:/var/lib/postgresql/data
+      # Runs once, on an empty data directory only. Creates nova_app.
+      - ./docker/api/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nova_owner -d nova"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    # No ports at all. The API reaches it over the compose network; nothing on
+    # the host needs it. Use `docker compose exec postgres psql` for a shell.
+    restart: unless-stopped
+
+# Pinned away from the voice platform's 172.30.0.0/24 on the shared host, and
+# away from infra/compose.yaml's 172.28.0.0/24.
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.29.0.0/24
+
+volumes:
+  api-postgres-data:
+  api-storage:

@@ -1,0 +1,10 @@
+{
+  "name": "@nova/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Versioned NOVA API, event, error, idempotency, and synchronization contracts",
+  "files": ["schemas"],
+  "exports": {
+    "./sync/v1": "./schemas/sync-v1.schema.json"
+  }
+}

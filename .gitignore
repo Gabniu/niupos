@@ -1,0 +1,22 @@
+.env
+.env.*
+!.env.example
+node_modules/
+vendor/
+.next/
+build/
+dist/
+coverage/
+.dart_tool/
+.idea/
+.vscode/
+storage/logs/
+storage/framework/
+infra/data/
+infra/.env.infisical
+infra/backups/
+
+# Generated knowledge-graph output and local deployment bundles.
+graphify-out/
+vault/90-generated/
+*.tar.gz

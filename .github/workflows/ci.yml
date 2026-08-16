@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  node-and-compose:
+    name: Architecture, web, and Compose
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.12.0
+          cache: npm
+
+      - name: Install locked Node dependencies
+        run: npm ci
+
+      - name: Run architecture tests
+        run: npm run test:architecture
+
+      - name: Lint web application
+        run: npm --workspace @nova/web run lint
+
+      - name: Build web application
+        run: npm --workspace @nova/web run build
+
+      - name: Validate local service topology
+        run: docker compose -f infra/compose.yaml config --quiet
+
+  laravel:
+    name: Laravel on PHP 8.5
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Run containerized Composer and Laravel checks
+        shell: pwsh
+        run: ./scripts/Test-CiVerification.ps1 -ApiOnly
+
+  auth:
+    name: NIU Auth
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      AUTH_DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/niu_auth_ci
+      BETTER_AUTH_SECRET: ci-only-build-secret-not-for-production
+      BETTER_AUTH_URL: http://127.0.0.1:3004
+    defaults:
+      run:
+        working-directory: apps/auth
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.12.0
+          cache: npm
+          cache-dependency-path: apps/auth/package-lock.json
+
+      - name: Install locked Auth dependencies
+        run: npm ci
+
+      - name: Lint Auth
+        run: npm run lint
+
+      - name: Test Auth
+        run: npm test
+
+      - name: Build Auth
+        run: npm run build

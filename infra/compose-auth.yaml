@@ -1,0 +1,82 @@
+# NOVA Identity — serves novaauth.niuautomations.com
+#
+# The shared sign-in service. POS, Booking and anything added later authenticate
+# against this over OAuth 2.1 / OIDC rather than keeping their own accounts, so
+# one person has one password across the whole product family.
+#
+# ITS OWN DATABASE, DELIBERATELY. Identity outlives every application that
+# consumes it: POS could be rebuilt from scratch and the accounts should
+# survive. Sharing the POS database would couple the two lifecycles and mean a
+# POS restore could roll back everyone's credentials. It is also the blast
+# radius argument — a SQL injection in POS should not reach password hashes.
+#
+# FIRST RUN, in order:
+#
+#   1. cp apps/auth/.env.production.example apps/auth/.env.production  and fill it
+#   2. docker compose -f infra/compose-auth.yaml up -d --build
+#   3. migrate — better-auth's own schema FIRST, then the control-plane tables:
+#        docker compose -f infra/compose-auth.yaml exec auth npm run auth:migrate
+#        docker compose -f infra/compose-auth.yaml exec -T postgres \
+#            psql -U auth_owner -d nova_auth < ../apps/auth/migrations/0001_auth_control_plane.sql
+#   4. set AUTH_BOOTSTRAP_TOKEN, restart, open /setup, create the first
+#      administrator, then REMOVE the token and restart again. The route is
+#      only live while the token is set and the user table is empty.
+
+name: nova-auth
+
+services:
+  auth:
+    build:
+      context: ..
+      dockerfile: infra/docker/auth/Dockerfile
+    env_file:
+      - ../apps/auth/.env.production
+    ports:
+      - "127.0.0.1:3004:3004"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      # Next listens on the container address rather than loopback in the
+      # production image. Probe the service hostname so Docker health reflects
+      # the actual listener (the public reverse proxy remains unchanged).
+      test: ["CMD", "node", "-e", "fetch('http://'+require('os').hostname()+':3004/sign-in').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  postgres:
+    image: postgres:17.6-alpine
+    environment:
+      POSTGRES_DB: nova_auth
+      POSTGRES_USER: auth_owner
+      POSTGRES_PASSWORD: ${NOVA_AUTH_DB_PASSWORD:-auth-local-only}
+    volumes:
+      - auth-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auth_owner -d nova_auth"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    # No published port. The auth service reaches it over the compose network;
+    # nothing on the host needs it. Use `compose exec postgres psql` for a
+    # shell, and the host-wide nightly backup reaches it through Docker.
+    restart: unless-stopped
+
+# Pinned clear of the other stacks on this host: 172.28 (nova dev infra),
+# 172.29 (nova pos), 172.30 (voice platform).
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.27.0.0/24
+
+volumes:
+  auth-postgres-data:

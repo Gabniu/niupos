@@ -1,0 +1,45 @@
+name: NIU Auth CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: auth-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  auth:
+    name: Lint, test, and build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      AUTH_DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/niu_auth_ci
+      BETTER_AUTH_SECRET: ci-only-build-secret-not-for-production
+      BETTER_AUTH_URL: http://127.0.0.1:3004
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.12.0
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build

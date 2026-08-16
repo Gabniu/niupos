@@ -1,0 +1,81 @@
+# Build-context exclusions for every image built from this repository
+# (infra/docker/api, infra/docker/auth, infra/docker/php-ci — all use the
+# repository root as their context).
+#
+# WHY THIS FILE IS NOT MERELY AN OPTIMISATION
+# ---------------------------------------------------------------------------
+# Without it, whatever happens to be sitting in the working tree is copied into
+# the image. That is a correctness and a security problem, not just a slow
+# build:
+#
+#   * bootstrap/cache/packages.php is Laravel's package manifest. Run
+#     `composer install` once WITH dev dependencies -- which CI does, and which
+#     anyone debugging locally does -- and it lists dev-only providers. Copy
+#     that file into a --no-dev image and `package:discover` aborts the build
+#     with "Class Laravel\Pail\PailServiceProvider not found". Encountered
+#     exactly that way, and the message points at the package rather than at
+#     the stale file that caused it.
+#
+#   * .env is the local development environment file, complete with APP_KEY
+#     and whatever credentials are in it. Copying it into an image bakes those
+#     secrets into a layer, where they survive being overwritten later and can
+#     be read by anyone who can pull the image.
+#
+#   * vendor/ and node_modules/ from the host may have been built for a
+#     different PHP or Node version, or with different flags, and would
+#     silently overwrite what the build just installed.
+
+# Version control and tooling
+.git
+.gitignore
+.gitattributes
+.editorconfig
+.devcontainer
+.github
+.idea
+.vscode
+
+# Dependencies -- every image installs its own
+**/vendor
+**/node_modules
+
+# Build output and framework caches. bootstrap/cache is the dangerous one; see
+# above. The entrypoint rebuilds all of these at container start anyway.
+**/bootstrap/cache/*
+**/.next
+**/dist
+**/build
+**/*.tsbuildinfo
+**/.phpunit.cache
+**/.phpunit.result.cache
+
+# Runtime state. storage/ is a mounted volume at run time, so anything here
+# would be shadowed immediately -- but logs and uploads have no business in an
+# image regardless.
+**/storage/logs
+**/storage/framework
+**/storage/app
+
+# Secrets. .env.example and .env.production.example are templates with no real
+# values and are deliberately NOT excluded -- the image documentation refers to
+# them.
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.production.example
+**/auth.json
+
+# Documentation and knowledge artifacts -- large, and no image needs them.
+vault
+graphify-out
+source-docs
+runbooks
+docs
+**/*.md
+!apps/*/README.md
+
+# Not built into any image
+apps/mobile
+tests
+infra/k8s
+infra/observability

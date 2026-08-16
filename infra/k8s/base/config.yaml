@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nova-api-config
+data:
+  APP_ENV: development
+  APP_DEBUG: "false"
+  LOG_CHANNEL: stderr
+  LOG_LEVEL: info
+  SESSION_DRIVER: redis
+  CACHE_STORE: redis
+  QUEUE_CONNECTION: rabbitmq
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nova-web-config
+data:
+  NODE_ENV: development
+  PORT: "3000"
+  HOSTNAME: 0.0.0.0
+
