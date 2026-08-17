@@ -22,7 +22,7 @@ cmp -s "$work_dir/.env.infisical" "$INFRA_DIR/.env.infisical" || cp "$work_dir/.
 
 docker compose --env-file "$INFRA_DIR/.env.infisical" -f "$INFRA_DIR/compose-infisical.yaml" up -d db redis backend
 docker compose --env-file "$INFRA_DIR/.env.infisical" -f "$INFRA_DIR/compose-infisical.yaml" \
-  exec -T db sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" psql -v ON_ERROR_STOP=1 -U infisical_owner -d infisical -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"'
+  exec -T db sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" psql -v ON_ERROR_STOP=1 -U infisical_owner -d infisical -c "DROP SCHEMA public CASCADE; DROP SCHEMA IF EXISTS pgboss CASCADE; CREATE SCHEMA public;"'
 docker compose --env-file "$INFRA_DIR/.env.infisical" -f "$INFRA_DIR/compose-infisical.yaml" \
   exec -T db sh -c 'PGPASSWORD="$POSTGRES_PASSWORD" psql -v ON_ERROR_STOP=1 -U infisical_owner -d infisical' < "$work_dir/infisical.sql"
 docker compose --env-file "$INFRA_DIR/.env.infisical" -f "$INFRA_DIR/compose-infisical.yaml" restart backend
