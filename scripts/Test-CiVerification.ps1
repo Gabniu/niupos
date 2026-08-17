@@ -57,6 +57,7 @@ Invoke-Checked 'Validating Composer metadata and running Laravel tests' {
         --mount "type=bind,source=$apiSource,target=/source,readonly" `
         --tmpfs '/workspace:exec' `
         --workdir /workspace `
+        --env 'APP_KEY=base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=' `
         $phpCiImage `
         sh -lc 'cp -a /source/. /workspace/ && mkdir -p storage/framework/views storage/framework/cache storage/framework/sessions storage/logs && composer validate --strict --no-interaction && composer install --no-interaction --prefer-dist --no-progress && php artisan test'
 }
