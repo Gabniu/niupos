@@ -41,10 +41,14 @@ reader was placed behind a Suspense boundary. Auth lint, TypeScript, tests
   is configured. Until then delivery intentionally fails closed and no recovery
   link is issued.
 
-Resend delivery support is enabled in the deployed Auth container through the
-`AUTH_RESEND_API_KEY` Infisical reference and a verified sender. A real
-password-recovery delivery assertion remains open; no raw API key belongs in
-this note or the control-plane database.
+Resend delivery support remains available through the server-side
+`AUTH_RESEND_API_KEY` fallback and a verified sender. The Infisical database
+backup was restored successfully, but the restored Universal Auth machine
+credentials currently return `401`; Auth is therefore intentionally using the
+environment fallback until a new machine secret is created in the private
+Infisical UI and an authenticated read passes. A real password-recovery
+delivery assertion remains open; no raw API key belongs in this note or the
+control-plane database.
 
 Google upstream sign-in is implemented but remains disabled by default. To offer
 customers a Google button without exposing Google credentials to consuming apps,
@@ -69,8 +73,14 @@ different Google/IdP credentials per organization.
 - [x] Deploy and verify `https://novaauth.niuautomations.com`: TLS, trusted
   origins, proxy forwarding, health checks, and security headers. Repeatable
   public checks are in `scripts/Test-AuthDeployment.ps1`.
-- [ ] Verify secure cookies, rate limits, backups/restore, monitoring, and
-  rollback with authenticated database-backed evidence.
+- [ ] Verify secure cookies, rate limits, monitoring, and rollback with
+  authenticated database-backed evidence.
+- [x] Create and verify encrypted age backups of the Infisical database and
+  encryption configuration; restore the latest backup successfully and keep
+  the private age identity offline.
+- [ ] Repair the Infisical Universal Auth machine credentials, verify an
+  authenticated secret read, and then exercise vault-outage fallback before
+  switching Auth back to `AUTH_SECRET_STORE=infisical`.
 - [x] Run the focused PHP/Composer/Docker federation suite in an isolated
   server-side PHP 8.5.3 container: 11 tests / 32 assertions passed; touched
   files pass Pint.
