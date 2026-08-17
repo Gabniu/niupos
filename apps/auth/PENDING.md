@@ -74,11 +74,12 @@ transport is configured and exercised end to end.
   and least-privilege `niu-auth-production` machine identity. The operator
   completed this through the private Infisical UI; Auth reports the required
   machine configuration without exposing credential values.
-- [ ] Repair the restored Auth machine credentials through the private
-  Infisical UI, then verify an authenticated secret read before switching the
-  deployed Auth read path back to `AUTH_SECRET_STORE=infisical`. The current
-  deployment intentionally uses the environment fallback; Google remains
-  disabled until its optional client secret is configured.
+- [x] Repair the restored Auth machine credentials through the private
+  Infisical UI, verify an authenticated read of `AUTH_RESEND_API_KEY` at
+  `/niu-auth` in `prod`, and switch the deployed Auth read path to
+  `AUTH_SECRET_STORE=infisical`. The environment fallback remains available
+  for rollback; Google remains disabled until its optional client secret is
+  configured.
 - [ ] Verify provider rotation, rollback, backup restore, and vault-outage
   recovery in a production-like run before enabling additional providers.
 - [ ] Enable `AUTH_SECRET_STORE_WRITE_ENABLED` only after production MFA

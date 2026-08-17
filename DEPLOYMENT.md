@@ -296,16 +296,16 @@ recreate only the Auth container and exercise recovery in a disposable stack
 before production use. Never paste the key into source, Graphify, or this
 runbook.
 
-### Planned self-hosted secret manager migration
+### Self-hosted secret manager migration
 
 The current production fallback remains available for rollback. The private
 self-hosted Infisical stack is deployed on the server, bound only to
 `127.0.0.1:3005`, and its database backup has been restored and verified. Auth
-is currently using the environment fallback because the restored Universal Auth
-machine credentials return `401`; do not switch back to Infisical until a new
-client secret has been created through the private Infisical UI and an
-authenticated secret read has passed. Google remains disabled until its
-optional secret is configured. The remaining migration checks are staged:
+is now using Infisical for Auth secret reads. The `niu-auth-production` machine
+identity authenticates successfully, and the production `AUTH_RESEND_API_KEY`
+read at `/niu-auth` has been verified without exposing its value. The
+environment fallback remains available for rollback. Google remains disabled
+until its optional secret is configured. The remaining hardening checks are:
 
 1. Deploy Infisical on a private Docker network; do not publish its UI/API or
    database to the internet.
@@ -313,10 +313,9 @@ optional secret is configured. The remaining migration checks are staged:
    machine identity limited to the Auth production path.
 3. Copy only Google/Resend provider secrets into the production path and verify
    read, rotation, rollback, backup restore, and vault-outage behavior.
-4. Set `AUTH_SECRET_STORE=infisical` only after the Universal Auth credentials
-   pass a server-side authenticated read. Retain the environment fallback
-   procedure and verify password sign-in, Google isolation, and email delivery
-   after each provider change.
+4. Keep the verified `AUTH_SECRET_STORE=infisical` deployment and retain the
+   environment fallback procedure while verifying password sign-in, Google
+   isolation, and email delivery after each provider change.
 5. Keep `AUTH_SECRET_STORE_WRITE_ENABLED=false` until the implemented
    session-scoped MFA step-up route (`/api/control/secrets/step-up`) has been
    verified in production. Only then allow write-only replacement from the

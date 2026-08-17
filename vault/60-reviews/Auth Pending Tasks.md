@@ -41,14 +41,13 @@ reader was placed behind a Suspense boundary. Auth lint, TypeScript, tests
   is configured. Until then delivery intentionally fails closed and no recovery
   link is issued.
 
-Resend delivery support remains available through the server-side
-`AUTH_RESEND_API_KEY` fallback and a verified sender. The Infisical database
-backup was restored successfully, but the restored Universal Auth machine
-credentials currently return `401`; Auth is therefore intentionally using the
-environment fallback until a new machine secret is created in the private
-Infisical UI and an authenticated read passes. A real password-recovery
-delivery assertion remains open; no raw API key belongs in this note or the
-control-plane database.
+Resend delivery support now reads `AUTH_RESEND_API_KEY` through the private
+Infisical production path `/niu-auth` using the least-privilege
+`niu-auth-production` machine identity. The authenticated read and Auth
+container health check passed after correcting the project ID; the environment
+fallback remains available for rollback. A real password-recovery delivery
+assertion remains open; no raw API key belongs in this note or the control-plane
+database.
 
 Google upstream sign-in is implemented but remains disabled by default. To offer
 customers a Google button without exposing Google credentials to consuming apps,
@@ -78,9 +77,10 @@ different Google/IdP credentials per organization.
 - [x] Create and verify encrypted age backups of the Infisical database and
   encryption configuration; restore the latest backup successfully and keep
   the private age identity offline.
-- [ ] Repair the Infisical Universal Auth machine credentials, verify an
-  authenticated secret read, and then exercise vault-outage fallback before
-  switching Auth back to `AUTH_SECRET_STORE=infisical`.
+- [x] Repair the Infisical Universal Auth machine credentials, verify an
+  authenticated secret read, and switch Auth to `AUTH_SECRET_STORE=infisical`.
+- [ ] Exercise vault-outage fallback and provider rotation/rollback evidence
+  before enabling additional providers or secret writes.
 - [x] Run the focused PHP/Composer/Docker federation suite in an isolated
   server-side PHP 8.5.3 container: 11 tests / 32 assertions passed; touched
   files pass Pint.
