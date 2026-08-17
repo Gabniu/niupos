@@ -71,7 +71,7 @@ transport is configured and exercised end to end.
 - [x] Add encrypted age backup/restore scripts for the Infisical database and
   encryption configuration; keep the age identity offline.
 - [x] Create the Infisical administrator, `NOVA Auth` production project/path,
-  and least-privilege `nova-auth-production` machine identity. The operator
+  and least-privilege `niu-auth-production` machine identity. The operator
   completed this through the private Infisical UI; Auth reports the required
   machine configuration without exposing credential values.
 - [ ] Repair the restored Auth machine credentials through the private

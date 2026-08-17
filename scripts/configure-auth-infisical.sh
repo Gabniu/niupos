@@ -10,11 +10,15 @@ ENV_FILE="${AUTH_ENV_FILE:-/opt/nova-pos/apps/auth/.env.production}"
 read -r -p "Infisical project ID: " project_id
 read -r -p "Infisical Universal Auth client ID: " client_id
 read -r -s -p "Infisical Universal Auth client secret: " client_secret
+read -r -p "Infisical secret path [/niu-auth]: " secret_path
 printf '\n'
+
+secret_path="${secret_path:-/niu-auth}"
 
 [[ "$project_id" =~ ^[A-Za-z0-9-]{20,100}$ ]] || { echo "Invalid project ID." >&2; exit 1; }
 [[ "$client_id" =~ ^[A-Za-z0-9-]{20,100}$ ]] || { echo "Invalid client ID." >&2; exit 1; }
 [[ -n "$client_secret" && ${#client_secret} -le 16384 ]] || { echo "Invalid client secret." >&2; exit 1; }
+[[ "$secret_path" =~ ^/[A-Za-z0-9][A-Za-z0-9/_-]{0,199}$ && "$secret_path" != *..* ]] || { echo "Invalid secret path." >&2; exit 1; }
 
 umask 077
 temporary="$(mktemp "${ENV_FILE}.XXXXXX")"
@@ -28,7 +32,7 @@ AUTH_SECRET_STORE_WRITE_ENABLED=false
 INFISICAL_API_URL=http://backend:8080
 INFISICAL_PROJECT_ID=$project_id
 INFISICAL_ENVIRONMENT=prod
-INFISICAL_SECRET_PATH=/nova-auth
+INFISICAL_SECRET_PATH=$secret_path
 INFISICAL_CLIENT_ID=$client_id
 INFISICAL_CLIENT_SECRET=$client_secret
 EOF
@@ -36,5 +40,5 @@ EOF
 chmod 600 "$temporary"
 mv "$temporary" "$ENV_FILE"
 trap - EXIT
-unset project_id client_id client_secret
+unset project_id client_id client_secret secret_path
 echo "Auth Infisical configuration saved with secret writes disabled. Restart Auth only after reviewing the configuration-safe health check."

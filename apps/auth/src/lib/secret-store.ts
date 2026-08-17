@@ -126,7 +126,7 @@ export function createSecretStoreFromEnvironment(): SecretStore {
     apiUrl: process.env.INFISICAL_API_URL!,
     projectId: process.env.INFISICAL_PROJECT_ID!,
     environment: process.env.INFISICAL_ENVIRONMENT!,
-    secretPath: process.env.INFISICAL_SECRET_PATH || "/nova-auth",
+    secretPath: process.env.INFISICAL_SECRET_PATH || "/niu-auth",
     clientId: process.env.INFISICAL_CLIENT_ID!,
     clientSecret: process.env.INFISICAL_CLIENT_SECRET!,
     organizationSlug: process.env.INFISICAL_ORG_SLUG,

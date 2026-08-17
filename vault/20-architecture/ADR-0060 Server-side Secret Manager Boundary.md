@@ -30,7 +30,7 @@ payloads. Audit evidence stores only the setting key and a SHA-256 fingerprint.
 - Keep Infisical private to the server/Docker network with TLS on any remote
   connection; do not publish its database or admin API publicly.
 - Use separate project/environment/path scopes for staging and production.
-- Give the Auth machine identity access only to `nova-auth/production` secrets.
+- Give the Auth machine identity access only to `niu-auth/production` secrets.
 - Enable administrator MFA and require the implemented session-scoped step-up
   confirmation at `/api/control/secrets/step-up` before every write. Verify
   this flow in the production deployment before enabling the write flag.
