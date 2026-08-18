@@ -82,8 +82,10 @@ verified; no reset URL or password is retained.
   `AUTH_SECRET_STORE=infisical`. The environment fallback remains available
   for rollback; Google remains disabled until its optional client secret is
   configured.
-- [ ] Verify provider rotation, rollback, backup restore, and vault-outage
-  recovery in a production-like run before enabling additional providers.
+- [x] Verify the controlled environment-fallback rollback, Infisical restore,
+  and return to Infisical with a healthy Auth container and authenticated read.
+- [ ] Verify real provider rotation and recovery while Infisical is unavailable
+  in a production-like run before enabling additional providers.
 - [ ] Enable `AUTH_SECRET_STORE_WRITE_ENABLED` only after production MFA
   step-up, secret replacement, audit fingerprint, and recovery E2E evidence
   are recorded.

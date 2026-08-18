@@ -81,8 +81,10 @@ different Google/IdP credentials per organization.
   the private age identity offline.
 - [x] Repair the Infisical Universal Auth machine credentials, verify an
   authenticated secret read, and switch Auth to `AUTH_SECRET_STORE=infisical`.
-- [ ] Exercise vault-outage fallback and provider rotation/rollback evidence
-  before enabling additional providers or secret writes.
+- [x] Verify the controlled environment-fallback rollback, Infisical restore,
+  and return to Infisical with a healthy Auth container and authenticated read.
+- [ ] Exercise real provider rotation and recovery while Infisical is
+  unavailable before enabling additional providers or secret writes.
 - [x] Run the focused PHP/Composer/Docker federation suite in an isolated
   server-side PHP 8.5.3 container: 11 tests / 32 assertions passed; touched
   files pass Pint.
