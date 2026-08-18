@@ -8,7 +8,7 @@ tests:
   [TEST-G6-SYNC-001, TEST-G6-SYNC-HTTP-001, TEST-G6-WEB-001, TEST-G6-MOB-001]
 risks: [RISK-G6-SYNC-001, RISK-G6-WEB-001, RISK-G6-MOB-001]
 modules: [MOD-SYNC, MOD-WEB, MOD-MOBILE]
-adrs: [ADR-0031, ADR-0032, ADR-0033, ADR-0034, ADR-0035, ADR-0065, ADR-0066, ADR-0067]
+adrs: [ADR-0031, ADR-0032, ADR-0033, ADR-0034, ADR-0035, ADR-0065, ADR-0066, ADR-0067, ADR-0068]
 ---
 
 # Gate 6 Offline Synchronization Foundation
@@ -49,6 +49,9 @@ adrs: [ADR-0031, ADR-0032, ADR-0033, ADR-0034, ADR-0035, ADR-0065, ADR-0066, ADR
 - The mobile repository fails closed on corrupt serialized state and requires an
   explicit tenant/device partition reset before a clean bootstrap; failed secure
   storage writes do not remain in memory as if they were durable.
+- The mobile client has a bounded, transport-neutral reconnect coordinator that
+  recovers interrupted sends, pulls changes, submits commands, handles
+  `retry_pending`, and performs a final pull without owning HTTP or auth.
 - Sync commands accept prolonged offline work within a configurable 30-day age
   window, reject timestamps more than 15 minutes ahead with `SYNC_CLOCK_SKEW`,
   and never persist an out-of-window command.
@@ -70,6 +73,8 @@ adrs: [ADR-0031, ADR-0032, ADR-0033, ADR-0034, ADR-0035, ADR-0065, ADR-0066, ADR
 - Mobile source and tests exist, but Dart/Flutter execution is pending because the
   SDK is not installed in the current environment; native Keychain/Keystore
   adapter and real-device crash/migration evidence are still required.
+- The mobile reconnect coordinator has four focused conformance tests; execution
+  is likewise pending the Dart SDK in this workspace.
 
 ## Remaining exit work
 
@@ -89,5 +94,6 @@ network/session boundary.
 - [[ADR-0032 Web Offline Repository and Sync Transport]]
 - [[ADR-0033 Flutter Offline Repository Boundary]]
 - [[ADR-0034 Sync Catalogue and Pricing Bootstrap Snapshot]]
+- [[ADR-0068 Mobile Sync Reconnect Coordinator Boundary]]
 - [[ADR-0014 Register and Device Enrollment Foundation]]
 - [[ADR-0023 Immutable Idempotent Sales Checkout Kernel]]

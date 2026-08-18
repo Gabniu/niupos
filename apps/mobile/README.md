@@ -1,9 +1,10 @@
 # NOVA Mobile
 
 Flutter-ready offline synchronization core for the owner/manager client. The
-current slice deliberately has no UI or network adapter: it establishes the
-tenant/device-partitioned local repository and versioned protocol models that a
-Flutter shell can consume after the server contract is frozen. Use
+current slice deliberately has no UI or concrete network adapter: it establishes
+the tenant/device-partitioned local repository, versioned protocol models, and a
+transport-neutral reconnect coordinator that a Flutter shell can consume after
+the server contract is frozen. Use
 `DurableSyncRepository` with a `SyncSecureStorage` implementation backed by
 Keychain, Keystore, or an equivalent OS secure store; the Dart core serializes
 state but does not encrypt it itself. Corrupt partitions fail closed and must be
