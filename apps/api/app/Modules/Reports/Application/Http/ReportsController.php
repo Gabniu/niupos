@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Modules\Reports\Application\Http;
 
 use App\Modules\Tenancy\Application\TenantContext;
+use App\Modules\Tenancy\Application\Contracts\WorkspacePreferencesReader;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,12 +13,14 @@ use Illuminate\Support\Facades\DB;
 
 final readonly class ReportsController
 {
-    public function __construct(private TenantContext $context) {}
+    public function __construct(private TenantContext $context, private WorkspacePreferencesReader $preferences) {}
 
     public function summary(Request $request): JsonResponse
     {
-        $from = $this->date($request->query('from'), CarbonImmutable::now()->startOfMonth());
-        $to = $this->date($request->query('to'), CarbonImmutable::now()->endOfDay());
+        $timezone = $this->preferences->reportingTimezone();
+        $now = CarbonImmutable::now($timezone);
+        $from = $this->date($request->query('from'), $now->startOfMonth()->utc(), $timezone, false);
+        $to = $this->date($request->query('to'), $now->endOfDay()->utc(), $timezone, true);
         if ($from->greaterThan($to) || $from->diffInDays($to) > 366) {
             return new JsonResponse(['error' => ['code' => 'invalid_period', 'message' => 'The report period is invalid.']], 422);
         }
@@ -43,13 +46,22 @@ final readonly class ReportsController
                 'grossMinor' => (int) $row->gross_minor,
             ])->values()->all();
 
-        return new JsonResponse(['data' => ['period' => ['from' => $from->toIso8601String(), 'to' => $to->toIso8601String()], 'totals' => $totals, 'topProducts' => $topProducts]]);
+        return new JsonResponse(['data' => ['period' => ['from' => $from->toIso8601String(), 'to' => $to->toIso8601String(), 'timezone' => $timezone], 'totals' => $totals, 'topProducts' => $topProducts]]);
     }
 
-    private function date(mixed $value, CarbonImmutable $fallback): CarbonImmutable
+    private function date(mixed $value, CarbonImmutable $fallback, string $timezone, bool $endOfDay): CarbonImmutable
     {
         $text = trim((string) $value);
         if ($text === '') return $fallback;
-        try { return CarbonImmutable::parse($text); } catch (\Throwable) { return CarbonImmutable::createFromTimestamp(0); }
+        try {
+            $date = CarbonImmutable::parse($text, $timezone);
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $text) === 1) {
+                $date = $endOfDay ? $date->endOfDay() : $date->startOfDay();
+            }
+
+            return $date->utc();
+        } catch (\Throwable) {
+            return CarbonImmutable::createFromTimestamp(0);
+        }
     }
 }

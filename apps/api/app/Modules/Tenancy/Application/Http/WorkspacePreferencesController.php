@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace App\Modules\Tenancy\Application\Http;
 
 use App\Modules\Tenancy\Application\TenantContext;
+use App\Modules\Tenancy\Application\Contracts\WorkspacePreferencesReader;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 final readonly class WorkspacePreferencesController
 {
-    public function __construct(private TenantContext $context) {}
+    public function __construct(private TenantContext $context, private WorkspacePreferencesReader $reader) {}
 
     public function show(): JsonResponse
     {
@@ -22,6 +23,7 @@ final readonly class WorkspacePreferencesController
         return new JsonResponse(['data' => [
             'sidePanelVisible' => $row === null ? true : (bool) $row->side_panel_visible,
             'kioskMode' => $row !== null && (bool) $row->kiosk_mode,
+            'reportingTimezone' => $this->reader->reportingTimezone(),
         ]]);
     }
 
@@ -30,12 +32,14 @@ final readonly class WorkspacePreferencesController
         $validated = $request->validate([
             'sidePanelVisible' => ['required', 'boolean'],
             'kioskMode' => ['required', 'boolean'],
+            'reportingTimezone' => ['sometimes', 'required', 'string', 'timezone'],
         ]);
         $tenantId = (string) $this->context->id();
 
         $values = [
             'side_panel_visible' => (bool) $validated['sidePanelVisible'],
             'kiosk_mode' => (bool) $validated['kioskMode'],
+            'reporting_timezone' => (string) ($validated['reportingTimezone'] ?? $this->reader->reportingTimezone()),
             'updated_at' => now(),
         ];
         if (DB::table('tenant_workspace_preferences')->where('tenant_id', $tenantId)->exists()) {

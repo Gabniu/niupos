@@ -139,9 +139,10 @@ Status (2026-08-12): the first read-only reporting slice is implemented. The
 tenant-scoped `reports.summary` endpoint and responsive web report page read
 finalized sales and immutable sale-line facts, preserve separate currencies,
 render explicit empty/error states, and now support Today, trailing seven-day,
-and current-month request bounds. Batch 7 remains open: organisation reporting
-timezone profiles and reconciliation evidence, search projections/rebuilds, and
-fiscal integration are not yet implemented.
+and current-month request bounds. Tenant reporting timezone configuration now
+drives date-only report bounds and is returned with the period metadata. Batch 7
+remains open: reconciliation evidence, search projections/rebuilds, and fiscal
+integration are not yet implemented.
 
 ### Batch 8 — Production readiness and pilot
 

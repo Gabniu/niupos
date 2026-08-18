@@ -6,6 +6,8 @@ namespace App\Modules\Tenancy;
 
 use App\Modules\Tenancy\Application\TenantContext;
 use App\Modules\Tenancy\Application\TenantScope;
+use App\Modules\Tenancy\Application\Contracts\WorkspacePreferencesReader;
+use App\Modules\Tenancy\Application\DatabaseWorkspacePreferencesReader;
 use App\Modules\Tenancy\Application\Contracts\TenantCreator;
 use App\Modules\Tenancy\Application\Contracts\OrganizationLocations;
 use App\Modules\Tenancy\Application\Contracts\TenantAccessAuthorizer;
@@ -23,6 +25,7 @@ final class TenancyServiceProvider extends ServiceProvider
         $this->app->bind(TenantAccessAuthorizer::class, DenyAllTenantAccess::class);
         $this->app->bind(OrganizationLocations::class, DatabaseOrganizationLocations::class);
         $this->app->bind(TenantCreator::class, DatabaseTenantCreator::class);
+        $this->app->bind(WorkspacePreferencesReader::class, DatabaseWorkspacePreferencesReader::class);
     }
 
     public function boot(): void
