@@ -30,6 +30,10 @@ adrs: [ADR-0031, ADR-0032, ADR-0033, ADR-0034, ADR-0035]
 - The web client has IndexedDB and in-memory repositories plus a strictly validating
   fetch adapter. The mobile client has a Flutter-ready repository contract and
   in-memory conformance implementation.
+- The web client has a bounded reconnect coordinator that recovers interrupted
+  outbox work, drains gapped change pages, submits queued commands with stable
+  ids, handles deferred retry receipts without spinning, and performs a final
+  change pull.
 - The web client registers a conservative service worker for same-origin UI
   resources, excludes `/api/` responses, uses network-first navigation, and
   provides an explicit offline fallback page without fabricating business data.
@@ -43,7 +47,7 @@ adrs: [ADR-0031, ADR-0032, ADR-0033, ADR-0034, ADR-0035]
 
 - Laravel integrated suite: 138 tests, 794 assertions.
 - MOD-SYNC focused suite: 9 tests, 42 assertions.
-- Web offline suite: 14 tests; ESLint and Next.js production build pass.
+- Web offline suite: 17 tests; ESLint and Next.js production build pass.
 - Repository architecture and shared-contract checks: 7 tests pass.
 - Mobile source and tests exist, but Dart/Flutter execution is pending because the
   SDK is not installed in the current environment.
@@ -55,7 +59,10 @@ command through the existing Sales application contract; unsupported commands
 remain explicit rejections. Catalogue/pricing field updates and hard deletes and
 bootstrap pagination/large-tenant transfer, persistent encrypted mobile storage,
 behavior, corrupt-state recovery, clock-skew/prolonged-partition tests, and an
-end-to-end reconnect scenario must pass before the gate can close.
+the real authenticated server/client reconnect scenario must pass before the
+gate can close. Coordinator-level reconnect behavior is now covered; remaining
+evidence must exercise it against the deployed API and an interrupted
+network/session boundary.
 
 ## Links
 
