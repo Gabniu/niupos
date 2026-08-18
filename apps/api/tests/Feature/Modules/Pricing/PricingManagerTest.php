@@ -144,6 +144,42 @@ final class PricingManagerTest extends TestCase
         self::assertDatabaseHas('sync_changes', ['entity_type' => 'pricing.tax_categories', 'entity_id' => $taxId, 'operation' => 'upsert']);
     }
 
+    #[Test]
+    public function updates_publish_fields_and_hard_deletes_publish_delete_changes(): void
+    {
+        [$tenantId, $variantId] = $this->catalogueFixture('Mutations');
+        [$bookId, $taxId, $priceId] = $this->inTenant($tenantId, function (PricingManager $manager) use ($variantId): array {
+            $tax = $manager->createTaxCategory('VAT16', 1600, true);
+            $book = $manager->createPriceBook('Retail', 'KES');
+            $price = $manager->createPrice((string) $book->getKey(), $variantId, (string) $tax->getKey(), 100, CarbonImmutable::parse('2026-08-01'));
+
+            return [(string) $book->getKey(), (string) $tax->getKey(), (string) $price->getKey()];
+        });
+
+        $this->inTenant($tenantId, function (PricingManager $manager) use ($bookId, $taxId, $priceId): void {
+            $manager->updatePriceBook($bookId, 'Wholesale', 'USD');
+            $manager->updateTaxCategory($taxId, 'VAT18', 1800, false);
+            $manager->updatePrice($priceId, 125, $taxId, CarbonImmutable::parse('2026-08-01'));
+        });
+
+        self::assertDatabaseHas('pricing_price_books', ['id' => $bookId, 'name' => 'Wholesale', 'currency_code' => 'USD']);
+        self::assertDatabaseHas('pricing_tax_categories', ['id' => $taxId, 'code' => 'VAT18', 'rate_basis_points' => 1800]);
+        self::assertDatabaseHas('pricing_product_prices', ['id' => $priceId, 'amount_minor' => 125]);
+
+        $this->inTenant($tenantId, function (PricingManager $manager) use ($bookId, $taxId, $priceId): void {
+            $manager->deletePrice($priceId);
+            $manager->deletePriceBook($bookId);
+            $manager->deleteTaxCategory($taxId);
+        });
+
+        self::assertDatabaseMissing('pricing_product_prices', ['id' => $priceId]);
+        self::assertDatabaseMissing('pricing_price_books', ['id' => $bookId]);
+        self::assertDatabaseMissing('pricing_tax_categories', ['id' => $taxId]);
+        self::assertDatabaseHas('sync_changes', ['entity_type' => 'pricing.product_prices', 'entity_id' => $priceId, 'operation' => 'delete']);
+        self::assertDatabaseHas('sync_changes', ['entity_type' => 'pricing.price_books', 'entity_id' => $bookId, 'operation' => 'delete']);
+        self::assertDatabaseHas('sync_changes', ['entity_type' => 'pricing.tax_categories', 'entity_id' => $taxId, 'operation' => 'delete']);
+    }
+
     /** @return array{string, string} */
     private function catalogueFixture(string $name): array
     {

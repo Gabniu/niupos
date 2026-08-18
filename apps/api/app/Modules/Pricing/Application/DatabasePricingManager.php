@@ -41,6 +41,28 @@ final readonly class DatabasePricingManager implements CheckoutQuoteProvider, Pr
         });
     }
 
+    public function updateTaxCategory(string $taxCategoryId, string $code, int $rateBasisPoints, bool $inclusive): TaxCategory
+    {
+        $code = mb_strtoupper(trim($code));
+        if ($code === '' || $rateBasisPoints < 0 || $rateBasisPoints > 10000) {
+            throw new InvalidArgumentException('Tax code and rate must be valid.');
+        }
+
+        return DB::transaction(function () use ($taxCategoryId, $code, $rateBasisPoints, $inclusive): TaxCategory {
+            $taxCategory = TaxCategory::query()->where('tenant_id', $this->tenantId())->whereKey($taxCategoryId)->lockForUpdate()->first();
+            if ($taxCategory === null) {
+                throw new DomainException('Tax category must belong to the current tenant.');
+            }
+            $taxCategory->update(['code' => $code, 'rate_basis_points' => $rateBasisPoints, 'is_inclusive' => $inclusive]);
+            $this->sync->publishChange('pricing.tax_categories', (string) $taxCategory->getKey(), 'upsert', [
+                'id' => (string) $taxCategory->getKey(), 'code' => $taxCategory->code, 'rateBasisPoints' => $taxCategory->rate_basis_points,
+                'isInclusive' => (bool) $taxCategory->is_inclusive, 'status' => $taxCategory->status,
+            ]);
+
+            return $taxCategory->refresh();
+        });
+    }
+
     public function createPriceBook(string $name, string $currencyCode): PriceBook
     {
         $name = trim($name);
@@ -57,6 +79,29 @@ final readonly class DatabasePricingManager implements CheckoutQuoteProvider, Pr
             ]);
 
             return $priceBook;
+        });
+    }
+
+    public function updatePriceBook(string $priceBookId, string $name, string $currencyCode): PriceBook
+    {
+        $name = trim($name);
+        $currencyCode = mb_strtoupper(trim($currencyCode));
+        if ($name === '' || preg_match('/^[A-Z]{3}$/', $currencyCode) !== 1) {
+            throw new InvalidArgumentException('Price book name and ISO currency code must be valid.');
+        }
+
+        return DB::transaction(function () use ($priceBookId, $name, $currencyCode): PriceBook {
+            $priceBook = PriceBook::query()->where('tenant_id', $this->tenantId())->whereKey($priceBookId)->lockForUpdate()->first();
+            if ($priceBook === null) {
+                throw new DomainException('Price book must belong to the current tenant.');
+            }
+            $priceBook->update(['name' => $name, 'currency_code' => $currencyCode]);
+            $this->sync->publishChange('pricing.price_books', (string) $priceBook->getKey(), 'upsert', [
+                'id' => (string) $priceBook->getKey(), 'name' => $priceBook->name, 'currencyCode' => $priceBook->currency_code,
+                'status' => $priceBook->status,
+            ]);
+
+            return $priceBook->refresh();
         });
     }
 
@@ -104,6 +149,56 @@ final readonly class DatabasePricingManager implements CheckoutQuoteProvider, Pr
         });
     }
 
+    public function updatePrice(string $priceId, int $amountMinor, string $taxCategoryId, DateTimeInterface $effectiveFrom, ?DateTimeInterface $effectiveUntil = null): ProductPrice
+    {
+        if ($amountMinor < 0) {
+            throw new InvalidArgumentException('Price cannot be negative.');
+        }
+        if ($effectiveUntil !== null && $effectiveUntil <= $effectiveFrom) {
+            throw new InvalidArgumentException('Price validity window must end after it starts.');
+        }
+
+        return DB::transaction(function () use ($priceId, $amountMinor, $taxCategoryId, $effectiveFrom, $effectiveUntil): ProductPrice {
+            $price = ProductPrice::query()->where('tenant_id', $this->tenantId())->whereKey($priceId)->first();
+            if ($price === null) {
+                throw new DomainException('Price must belong to the current tenant.');
+            }
+            if (! PriceBook::query()->where('tenant_id', $this->tenantId())->where('status', PricingStatus::Active->value)->whereKey($price->price_book_id)->lockForUpdate()->exists()) {
+                throw new DomainException('Price book must be active and belong to the current tenant.');
+            }
+            $price = ProductPrice::query()->where('tenant_id', $this->tenantId())->whereKey($priceId)->lockForUpdate()->first();
+            if ($price === null) {
+                throw new DomainException('Price must belong to the current tenant.');
+            }
+            if (! $this->variants->existsForCurrentTenant((string) $price->product_variant_id)) {
+                throw new DomainException('Variant must be active and belong to the current tenant.');
+            }
+            if (! TaxCategory::query()->where('tenant_id', $this->tenantId())->where('status', PricingStatus::Active->value)->whereKey($taxCategoryId)->exists()) {
+                throw new DomainException('Tax category must be active and belong to the current tenant.');
+            }
+            $overlap = ProductPrice::query()->where('tenant_id', $this->tenantId())->where('price_book_id', $price->price_book_id)
+                ->where('product_variant_id', $price->product_variant_id)->where($price->getKeyName(), '!=', $price->getKey())
+                ->where(function ($query) use ($effectiveUntil): void {
+                    if ($effectiveUntil !== null) {
+                        $query->where('effective_from', '<', $effectiveUntil);
+                    }
+                })->where(function ($query) use ($effectiveFrom): void {
+                    $query->whereNull('effective_until')->orWhere('effective_until', '>', $effectiveFrom);
+                })->lockForUpdate()->exists();
+            if ($overlap) {
+                throw new DomainException('Price validity window overlaps an existing price.');
+            }
+            $price->update(['tax_category_id' => $taxCategoryId, 'amount_minor' => $amountMinor, 'effective_from' => $effectiveFrom, 'effective_until' => $effectiveUntil]);
+            $this->sync->publishChange('pricing.product_prices', (string) $price->getKey(), 'upsert', [
+                'id' => (string) $price->getKey(), 'priceBookId' => (string) $price->price_book_id, 'variantId' => (string) $price->product_variant_id,
+                'taxCategoryId' => (string) $price->tax_category_id, 'amountMinor' => $price->amount_minor,
+                'effectiveFrom' => $price->effective_from?->toISOString(), 'effectiveUntil' => $price->effective_until?->toISOString(),
+            ]);
+
+            return $price->refresh();
+        });
+    }
+
     public function resolvePrice(string $priceBookId, string $variantId, DateTimeInterface $at): ?ProductPrice
     {
         return ProductPrice::query()->where('tenant_id', $this->tenantId())->where('price_book_id', $priceBookId)->where('product_variant_id', $variantId)
@@ -139,6 +234,51 @@ final readonly class DatabasePricingManager implements CheckoutQuoteProvider, Pr
             'id' => (string) $tax->getKey(), 'code' => $tax->code, 'rateBasisPoints' => $tax->rate_basis_points,
             'isInclusive' => (bool) $tax->is_inclusive, 'status' => $tax->status,
         ]);
+    }
+
+    public function deletePrice(string $priceId): void
+    {
+        DB::transaction(function () use ($priceId): void {
+            $price = ProductPrice::query()->where('tenant_id', $this->tenantId())->whereKey($priceId)->lockForUpdate()->first();
+            if ($price === null) {
+                throw new DomainException('Price must belong to the current tenant.');
+            }
+            $id = (string) $price->getKey();
+            $price->delete();
+            $this->sync->publishChange('pricing.product_prices', $id, 'delete', ['id' => $id]);
+        });
+    }
+
+    public function deletePriceBook(string $priceBookId): void
+    {
+        DB::transaction(function () use ($priceBookId): void {
+            $priceBook = PriceBook::query()->where('tenant_id', $this->tenantId())->whereKey($priceBookId)->lockForUpdate()->first();
+            if ($priceBook === null) {
+                throw new DomainException('Price book must belong to the current tenant.');
+            }
+            if (ProductPrice::query()->where('tenant_id', $this->tenantId())->where('price_book_id', $priceBook->getKey())->exists()) {
+                throw new DomainException('Price book cannot be deleted while prices reference it.');
+            }
+            $id = (string) $priceBook->getKey();
+            $priceBook->delete();
+            $this->sync->publishChange('pricing.price_books', $id, 'delete', ['id' => $id]);
+        });
+    }
+
+    public function deleteTaxCategory(string $taxCategoryId): void
+    {
+        DB::transaction(function () use ($taxCategoryId): void {
+            $taxCategory = TaxCategory::query()->where('tenant_id', $this->tenantId())->whereKey($taxCategoryId)->lockForUpdate()->first();
+            if ($taxCategory === null) {
+                throw new DomainException('Tax category must belong to the current tenant.');
+            }
+            if (ProductPrice::query()->where('tenant_id', $this->tenantId())->where('tax_category_id', $taxCategory->getKey())->exists()) {
+                throw new DomainException('Tax category cannot be deleted while prices reference it.');
+            }
+            $id = (string) $taxCategory->getKey();
+            $taxCategory->delete();
+            $this->sync->publishChange('pricing.tax_categories', $id, 'delete', ['id' => $id]);
+        });
     }
 
     public function quote(string $priceBookId, string $variantId, int $quantity, string $currencyCode, DateTimeInterface $at): CheckoutLineQuote

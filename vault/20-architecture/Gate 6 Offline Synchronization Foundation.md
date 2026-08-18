@@ -8,7 +8,7 @@ tests:
   [TEST-G6-SYNC-001, TEST-G6-SYNC-HTTP-001, TEST-G6-WEB-001, TEST-G6-MOB-001]
 risks: [RISK-G6-SYNC-001, RISK-G6-WEB-001, RISK-G6-MOB-001]
 modules: [MOD-SYNC, MOD-WEB, MOD-MOBILE]
-adrs: [ADR-0031, ADR-0032, ADR-0033, ADR-0034, ADR-0035, ADR-0065, ADR-0066]
+adrs: [ADR-0031, ADR-0032, ADR-0033, ADR-0034, ADR-0035, ADR-0065, ADR-0066, ADR-0067]
 ---
 
 # Gate 6 Offline Synchronization Foundation
@@ -52,15 +52,20 @@ adrs: [ADR-0031, ADR-0032, ADR-0033, ADR-0034, ADR-0035, ADR-0065, ADR-0066]
 - Sync commands accept prolonged offline work within a configurable 30-day age
   window, reject timestamps more than 15 minutes ahead with `SYNC_CLOCK_SKEW`,
   and never persist an out-of-window command.
+- Catalogue and pricing managers now publish complete upserts for field updates
+  and transactional delete tombstones for products, variants, barcodes, prices,
+  price books, and tax categories; referenced records remain protected by
+  composite foreign keys.
 
 ## Verification evidence
 
 - Laravel integrated suite: 138 tests, 794 assertions.
-- MOD-SYNC focused suite: 9 tests, 42 assertions.
+- MOD-SYNC focused suite: 9 tests, 42 assertions (before the latest mutation-feed
+  additions).
 - Web offline suite: 19 tests; ESLint and TypeScript checks pass. The Next.js
   build remains the final local web check after this contract addition.
 - Repository architecture and shared-contract checks: 7 tests pass.
-- Clock-window domain and HTTP regression tests are present; PHP execution is
+- Clock-window and mutation-feed domain/HTTP regression tests are present; PHP execution is
   pending because the local Docker daemon is unavailable.
 - Mobile source and tests exist, but Dart/Flutter execution is pending because the
   SDK is not installed in the current environment; native Keychain/Keystore
@@ -70,9 +75,9 @@ adrs: [ADR-0031, ADR-0032, ADR-0033, ADR-0034, ADR-0035, ADR-0065, ADR-0066]
 
 Gate 6 remains **in progress**. The server now executes one `sales.finalize.v1`
 command through the existing Sales application contract; unsupported commands
-remain explicit rejections. Catalogue/pricing field updates and hard deletes,
-native encrypted mobile storage adapters and a real authenticated server/client
-reconnect scenario must pass before the gate can close. Clock-skew and
+remain explicit rejections. Native encrypted mobile storage adapters and a real
+authenticated server/client reconnect scenario must pass before the gate can
+close. Catalogue/pricing mutation feed coverage, clock-skew and
 prolonged-partition policy tests are now covered. Coordinator-level reconnect behavior is now covered;
 remaining
 evidence must exercise it against the deployed API and an interrupted

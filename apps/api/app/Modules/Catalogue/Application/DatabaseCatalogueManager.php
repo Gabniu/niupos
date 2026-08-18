@@ -80,6 +80,82 @@ final readonly class DatabaseCatalogueManager implements CatalogueManager
         return ProductVariant::query()->where('tenant_id', $tenantId)->where('status', CatalogueStatus::Active->value)->find($identity->product_variant_id);
     }
 
+    public function updateProduct(string $productId, string $name, ?string $categoryId = null): Product
+    {
+        $tenantId = (string) $this->tenantContext->id();
+        $name = trim($name);
+        if ($name === '') {
+            throw new InvalidArgumentException('Product name cannot be empty.');
+        }
+        if ($categoryId !== null && ! Category::query()->where('tenant_id', $tenantId)->where('status', CatalogueStatus::Active->value)->whereKey($categoryId)->exists()) {
+            throw new DomainException('Category must be active and belong to the current tenant.');
+        }
+
+        return DB::transaction(function () use ($tenantId, $productId, $name, $categoryId): Product {
+            $product = Product::query()->where('tenant_id', $tenantId)->whereKey($productId)->lockForUpdate()->first();
+            if ($product === null) {
+                throw new DomainException('Product must belong to the current tenant.');
+            }
+            $product->update(['name' => $name, 'category_id' => $categoryId]);
+            $this->sync->publishChange('catalogue.products', (string) $product->getKey(), 'upsert', [
+                'id' => (string) $product->getKey(), 'name' => $product->name, 'categoryId' => $product->category_id,
+                'status' => $product->status,
+            ]);
+
+            return $product->refresh();
+        });
+    }
+
+    public function updateVariant(string $variantId, string $name, string $sku, string $unitOfMeasureId): ProductVariant
+    {
+        $tenantId = (string) $this->tenantContext->id();
+        $name = trim($name);
+        $normalizedSku = self::normalizeSku($sku);
+        if ($name === '') {
+            throw new InvalidArgumentException('Variant name cannot be empty.');
+        }
+        if (! UnitOfMeasure::query()->where('tenant_id', $tenantId)->where('status', CatalogueStatus::Active->value)->whereKey($unitOfMeasureId)->exists()) {
+            throw new DomainException('Unit of measure must be active and belong to the current tenant.');
+        }
+
+        return DB::transaction(function () use ($tenantId, $variantId, $name, $sku, $normalizedSku, $unitOfMeasureId): ProductVariant {
+            $variant = ProductVariant::query()->where('tenant_id', $tenantId)->whereKey($variantId)->lockForUpdate()->first();
+            if ($variant === null) {
+                throw new DomainException('Variant must belong to the current tenant.');
+            }
+            $variant->update(['name' => $name, 'sku' => trim($sku), 'normalized_sku' => $normalizedSku, 'unit_of_measure_id' => $unitOfMeasureId]);
+            $this->sync->publishChange('catalogue.variants', (string) $variant->getKey(), 'upsert', [
+                'id' => (string) $variant->getKey(), 'productId' => (string) $variant->product_id, 'name' => $variant->name,
+                'sku' => $variant->sku, 'unitOfMeasureId' => (string) $variant->unit_of_measure_id, 'status' => $variant->status,
+            ]);
+
+            return $variant->refresh();
+        });
+    }
+
+    public function updateBarcode(string $barcodeId, string $value): Barcode
+    {
+        $tenantId = (string) $this->tenantContext->id();
+        $normalizedValue = self::normalizeBarcode($value);
+
+        return DB::transaction(function () use ($tenantId, $barcodeId, $value, $normalizedValue): Barcode {
+            $barcode = Barcode::query()->where('tenant_id', $tenantId)->whereKey($barcodeId)->lockForUpdate()->first();
+            if ($barcode === null) {
+                throw new DomainException('Barcode must belong to the current tenant.');
+            }
+            if (! ProductVariant::query()->where('tenant_id', $tenantId)->where('status', CatalogueStatus::Active->value)->whereKey($barcode->product_variant_id)->exists()) {
+                throw new DomainException('Barcode variant must be active and belong to the current tenant.');
+            }
+            $barcode->update(['value' => trim($value), 'normalized_value' => $normalizedValue]);
+            $this->sync->publishChange('catalogue.barcodes', (string) $barcode->getKey(), 'upsert', [
+                'id' => (string) $barcode->getKey(), 'variantId' => (string) $barcode->product_variant_id,
+                'value' => $barcode->value, 'status' => $barcode->status,
+            ]);
+
+            return $barcode->refresh();
+        });
+    }
+
     public function deactivateProduct(string $productId): void
     {
         $tenantId = (string) $this->tenantContext->id();
@@ -109,6 +185,27 @@ final readonly class DatabaseCatalogueManager implements CatalogueManager
                     ]);
                 }
             }
+        });
+    }
+
+    public function deleteProduct(string $productId): void
+    {
+        $tenantId = (string) $this->tenantContext->id();
+        DB::transaction(function () use ($tenantId, $productId): void {
+            $product = Product::query()->where('tenant_id', $tenantId)->whereKey($productId)->lockForUpdate()->first();
+            if ($product === null) {
+                throw new DomainException('Product must belong to the current tenant.');
+            }
+            $variants = ProductVariant::query()->where('tenant_id', $tenantId)->where('product_id', $product->getKey())->lockForUpdate()->get();
+            foreach ($variants as $variant) {
+                $barcodes = Barcode::query()->where('tenant_id', $tenantId)->where('product_variant_id', $variant->getKey())->lockForUpdate()->get();
+                foreach ($barcodes as $barcode) {
+                    $this->sync->publishChange('catalogue.barcodes', (string) $barcode->getKey(), 'delete', ['id' => (string) $barcode->getKey()]);
+                }
+                $this->sync->publishChange('catalogue.variants', (string) $variant->getKey(), 'delete', ['id' => (string) $variant->getKey()]);
+            }
+            $this->sync->publishChange('catalogue.products', (string) $product->getKey(), 'delete', ['id' => (string) $product->getKey()]);
+            $product->delete();
         });
     }
 

@@ -66,6 +66,33 @@ final class CatalogueManagerTest extends TestCase
     }
 
     #[Test]
+    public function updates_publish_current_fields_and_hard_deletes_publish_child_deletes(): void
+    {
+        [$tenantId, $unitId, $categoryId] = $this->tenantFixture('Mutations');
+        $created = $this->inTenant($tenantId, fn (CatalogueManager $manager) => $manager->createProductWithDefaultVariant('Tea', 'TEA-MUTATE', $unitId, $categoryId, '123456'));
+
+        $this->inTenant($tenantId, function (CatalogueManager $manager) use ($created, $unitId): void {
+            $manager->updateProduct((string) $created->product->getKey(), 'Coffee');
+            $manager->updateVariant((string) $created->defaultVariant->getKey(), 'Coffee Large', ' coffee 2 ', $unitId);
+            $manager->updateBarcode((string) $created->barcode?->getKey(), ' 654321 ');
+        });
+
+        self::assertDatabaseHas('catalogue_products', ['id' => $created->product->getKey(), 'name' => 'Coffee']);
+        self::assertDatabaseHas('catalogue_product_variants', ['id' => $created->defaultVariant->getKey(), 'normalized_sku' => 'COFFEE2']);
+        self::assertDatabaseHas('catalogue_barcodes', ['id' => $created->barcode?->getKey(), 'normalized_value' => '654321']);
+        self::assertDatabaseHas('sync_changes', ['entity_type' => 'catalogue.products', 'entity_id' => $created->product->getKey(), 'operation' => 'upsert']);
+
+        $this->inTenant($tenantId, fn (CatalogueManager $manager) => $manager->deleteProduct((string) $created->product->getKey()));
+
+        self::assertDatabaseMissing('catalogue_products', ['id' => $created->product->getKey()]);
+        self::assertDatabaseMissing('catalogue_product_variants', ['id' => $created->defaultVariant->getKey()]);
+        self::assertDatabaseMissing('catalogue_barcodes', ['id' => $created->barcode?->getKey()]);
+        self::assertDatabaseHas('sync_changes', ['entity_type' => 'catalogue.products', 'entity_id' => $created->product->getKey(), 'operation' => 'delete']);
+        self::assertDatabaseHas('sync_changes', ['entity_type' => 'catalogue.variants', 'entity_id' => $created->defaultVariant->getKey(), 'operation' => 'delete']);
+        self::assertDatabaseHas('sync_changes', ['entity_type' => 'catalogue.barcodes', 'entity_id' => $created->barcode?->getKey(), 'operation' => 'delete']);
+    }
+
+    #[Test]
     public function duplicate_normalized_sku_and_barcode_are_rejected_within_a_tenant(): void
     {
         [$tenantId, $unitId] = $this->tenantFixture('Duplicate');
