@@ -81,14 +81,16 @@ Exit: cash and simulated asynchronous payment outcomes reconcile to immutable sa
 
 Exit: a device can download catalogue/pricing, create one offline checkout command, reconnect, and resolve duplicate delivery deterministically.
 
-Status (2026-08-12): the shared v1 schema, tenant/device-scoped server change feed
+Status (2026-08-18): the shared v1 schema, tenant/device-scoped server change feed
 and command inbox, authenticated HTTP transport, web IndexedDB repository and
-network adapter, and Flutter-ready repository core are implemented. The server
-now executes one `sales.finalize.v1` command and the web shell has a conservative
-installable service-worker fallback. Batch 6 is not closed: catalogue/pricing
-hard-delete semantics and large-tenant bootstrap transfer, persistent encrypted
-mobile storage, corrupt-state recovery, clock-skew/prolonged-partition tests, and
-the full reconnect/duplicate-delivery vertical acceptance test remain open. See
+network adapter, paged bootstrap transfer, and Flutter-ready durable repository
+core are implemented. Catalogue and pricing updates now publish complete
+upserts, and hard deletes publish transactional tombstones with tenant-safe
+foreign-key guards. The server now executes one `sales.finalize.v1` command and
+the web shell has a conservative installable service-worker fallback. Batch 6 is
+not closed: native encrypted mobile storage adapters, Flutter/Dart execution and
+device evidence, and a deployed authenticated reconnect/duplicate-delivery
+acceptance test remain open. See
 [[Gate 6 Offline Synchronization Foundation]], [[ADR-0031 Offline Synchronization Protocol Foundation]],
 [[ADR-0032 Web Offline Repository and Sync Transport]], and
 [[ADR-0033 Flutter Offline Repository Boundary]].
@@ -188,7 +190,9 @@ ownership or tenant admission rules.
 
 Approximately 52–60% of the full operational MVP is implemented. Batch 6 now has
 a frozen shared sync contract, durable server protocol and authenticated transport,
-an executable `sales.finalize.v1` adapter, plus aligned web and mobile repository foundations. Live M-Pesa callback
-authentication, physical delivery adapters, sync domain adapters and projection
-producers, persistent mobile storage, installable web offline behavior, advanced
-reporting, search, fiscal integration, and production-readiness evidence remain open.
+an executable `sales.finalize.v1` adapter, complete catalogue/pricing mutation
+publication, plus aligned web and mobile repository foundations. Native mobile
+secure-storage adapters and deployed reconnect evidence remain open, along with
+live M-Pesa callback authentication, physical delivery adapters, remaining sync
+domain projection producers, advanced reporting, search, fiscal integration, and
+production-readiness evidence.

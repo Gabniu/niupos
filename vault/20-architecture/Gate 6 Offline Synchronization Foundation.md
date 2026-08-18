@@ -65,8 +65,8 @@ adrs: [ADR-0031, ADR-0032, ADR-0033, ADR-0034, ADR-0035, ADR-0065, ADR-0066, ADR
 - Web offline suite: 19 tests; ESLint and TypeScript checks pass. The Next.js
   build remains the final local web check after this contract addition.
 - Repository architecture and shared-contract checks: 7 tests pass.
-- Clock-window and mutation-feed domain/HTTP regression tests are present; PHP execution is
-  pending because the local Docker daemon is unavailable.
+- Clock-window and mutation-feed domain/HTTP regression tests are present; PHP
+  execution is pending because the local Docker daemon is unavailable.
 - Mobile source and tests exist, but Dart/Flutter execution is pending because the
   SDK is not installed in the current environment; native Keychain/Keystore
   adapter and real-device crash/migration evidence are still required.
@@ -78,9 +78,8 @@ command through the existing Sales application contract; unsupported commands
 remain explicit rejections. Native encrypted mobile storage adapters and a real
 authenticated server/client reconnect scenario must pass before the gate can
 close. Catalogue/pricing mutation feed coverage, clock-skew and
-prolonged-partition policy tests are now covered. Coordinator-level reconnect behavior is now covered;
-remaining
-evidence must exercise it against the deployed API and an interrupted
+prolonged-partition policy tests are now covered. Coordinator-level reconnect behavior is now covered; remaining evidence must
+exercise it against the deployed API and an interrupted
 network/session boundary.
 
 ## Links
