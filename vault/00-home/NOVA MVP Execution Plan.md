@@ -143,9 +143,10 @@ and current-month request bounds. Tenant reporting timezone configuration now
 drives date-only report bounds and is returned with the period metadata. A
 read-only sale-to-line reconciliation endpoint now reports explicit drift
 evidence. Batch 7 remains open: payment reconciliation and fiscal integration.
-A provider-neutral tenant search projection/rebuild boundary now exists;
-Elasticsearch indexing, lag metrics, alias cutover, and resilience evidence
-remain open.
+A provider-neutral tenant search projection/rebuild boundary now exists, and
+its rebuild source reads active catalogue products, variants, and barcodes from
+tenant-qualified authoritative tables. Elasticsearch indexing, lag metrics,
+alias cutover, and resilience evidence remain open.
 
 ### Batch 8 — Production readiness and pilot
 
