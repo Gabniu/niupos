@@ -9,6 +9,7 @@ use App\Modules\Sync\Application\Contracts\SyncProtocol;
 use App\Modules\Sync\Application\Data\SyncChange;
 use App\Modules\Sync\Application\Data\SyncCommandEnvelope;
 use App\Modules\Sync\Application\Data\SyncCommandReceipt;
+use App\Modules\Sync\Application\SyncClockWindowException;
 use DomainException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -112,6 +113,8 @@ final readonly class SyncController
             $receipt = $this->sync->submit($device, new SyncCommandEnvelope(
                 (string) $data['version'], $data['commandId'], trim($data['type']), $data['occurredAt'], $data['payload'],
             ));
+        } catch (SyncClockWindowException) {
+            return $this->failure(Response::HTTP_UNPROCESSABLE_ENTITY, 'SYNC_CLOCK_SKEW', 'The command timestamp is outside the synchronization clock window.');
         } catch (InvalidArgumentException) {
             return $this->failure(Response::HTTP_UNPROCESSABLE_ENTITY, 'SYNC_INVALID', 'The synchronization command is invalid.');
         } catch (DomainException) {

@@ -15,6 +15,7 @@ use App\Modules\Tenancy\Domain\Branch;
 use App\Modules\Tenancy\Domain\Company;
 use App\Modules\Tenancy\Domain\Tenant;
 use App\Modules\Tenancy\Domain\TenantId;
+use Carbon\Carbon;
 use DomainException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -66,6 +67,31 @@ final class SyncProtocolTest extends TestCase
 
         $this->expectException(RuntimeException::class);
         $this->inTenant($tenant, fn (SyncProtocol $sync) => $sync->submit($device, new SyncCommandEnvelope('1', $command->commandId, $command->type, $command->occurredAt, ['saleId' => 'changed'])));
+    }
+
+    #[Test]
+    public function extreme_offline_command_timestamps_are_rejected_without_storing_the_command(): void
+    {
+        [$tenant, $device] = $this->deviceFixture('Clock window');
+        Carbon::setTestNow(Carbon::parse('2026-08-18T10:00:00+03:00'));
+
+        try {
+            foreach (['2026-06-01T10:00:00+03:00', '2026-08-18T10:20:01+03:00'] as $occurredAt) {
+                try {
+                    $this->inTenant($tenant, fn (SyncProtocol $sync) => $sync->submit(
+                        $device,
+                        new SyncCommandEnvelope('1', (string) Str::uuid(), 'sales.finalize.v1', $occurredAt, ['saleId' => 'clock']),
+                    ));
+                    self::fail('An extreme command timestamp was accepted.');
+                } catch (\InvalidArgumentException $exception) {
+                    self::assertSame('The command timestamp is outside the synchronization clock window.', $exception->getMessage());
+                }
+            }
+        } finally {
+            Carbon::setTestNow();
+        }
+
+        self::assertSame(0, DB::table('sync_command_inbox')->count());
     }
 
     #[Test]

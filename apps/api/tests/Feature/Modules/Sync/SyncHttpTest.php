@@ -18,6 +18,7 @@ use App\Modules\Tenancy\Domain\Branch;
 use App\Modules\Tenancy\Domain\Company;
 use App\Modules\Tenancy\Domain\Tenant;
 use App\Modules\Tenancy\Domain\TenantId;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -148,6 +149,26 @@ final class SyncHttpTest extends TestCase
 
         $this->withToken($token)->withHeaders($headers)->postJson('/api/v1/sync/commands', $command + ['tenantId' => $tenant])
             ->assertUnprocessable()->assertJsonPath('error.code', 'SYNC_INVALID');
+    }
+
+    #[Test]
+    public function command_clock_skew_returns_a_stable_client_error(): void
+    {
+        [$tenant, , $token] = $this->identityFixture(['sync.use']);
+        $device = $this->activeDevice($tenant);
+        Carbon::setTestNow(Carbon::parse('2026-08-18T10:00:00+03:00'));
+
+        try {
+            $this->withToken($token)->withHeaders(['X-Tenant-ID' => $tenant, 'X-Device-Id' => $device])
+                ->postJson('/api/v1/sync/commands', [
+                    'version' => '1', 'commandId' => fake()->uuid(), 'type' => 'sales.finalize.v1',
+                    'occurredAt' => '2026-06-01T10:00:00+03:00', 'payload' => ['saleId' => fake()->uuid()],
+                ])->assertUnprocessable()->assertJsonPath('error.code', 'SYNC_CLOCK_SKEW');
+        } finally {
+            Carbon::setTestNow();
+        }
+
+        self::assertSame(0, DB::table('sync_command_inbox')->count());
     }
 
     #[Test]

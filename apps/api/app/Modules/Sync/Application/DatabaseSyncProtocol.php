@@ -160,10 +160,17 @@ final readonly class DatabaseSyncProtocol implements SyncProtocol
         if ($command->version !== '1' || ! Str::isUuid($command->commandId) || trim($command->type) === '' || strlen($command->type) > 128) {
             throw new InvalidArgumentException('A v1 command UUID and bounded type are required.');
         }
+        $occurredAt = null;
         try {
-            new DateTimeImmutable($command->occurredAt);
+            $occurredAt = new DateTimeImmutable($command->occurredAt);
         } catch (\Throwable) {
             throw new InvalidArgumentException('occurredAt must be an ISO-8601 timestamp.');
+        }
+        $ageSeconds = now()->getTimestamp() - $occurredAt->getTimestamp();
+        $maxAge = max(0, (int) config('sync.command_clock.max_age_seconds', 2_592_000));
+        $maxFuture = max(0, (int) config('sync.command_clock.max_future_seconds', 900));
+        if ($ageSeconds > $maxAge || $ageSeconds < -$maxFuture) {
+            throw new SyncClockWindowException('The command timestamp is outside the synchronization clock window.');
         }
     }
 
