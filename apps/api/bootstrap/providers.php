@@ -11,6 +11,7 @@ use App\Modules\Pricing\PricingServiceProvider;
 use App\Modules\Receipts\ReceiptsServiceProvider;
 use App\Modules\Reports\ReportsServiceProvider;
 use App\Modules\Register\RegisterServiceProvider;
+use App\Modules\Search\SearchServiceProvider;
 use App\Modules\Sales\SalesServiceProvider;
 use App\Modules\Shifts\ShiftsServiceProvider;
 use App\Modules\Sync\SyncServiceProvider;
@@ -29,6 +30,7 @@ return [
     ChannelsServiceProvider::class,
     ReceiptsServiceProvider::class,
     ReportsServiceProvider::class,
+    SearchServiceProvider::class,
     RegisterServiceProvider::class,
     SalesServiceProvider::class,
     ShiftsServiceProvider::class,
