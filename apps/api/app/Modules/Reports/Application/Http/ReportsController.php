@@ -17,10 +17,7 @@ final readonly class ReportsController
 
     public function summary(Request $request): JsonResponse
     {
-        $timezone = $this->preferences->reportingTimezone();
-        $now = CarbonImmutable::now($timezone);
-        $from = $this->date($request->query('from'), $now->startOfMonth()->utc(), $timezone, false);
-        $to = $this->date($request->query('to'), $now->endOfDay()->utc(), $timezone, true);
+        [$from, $to, $timezone] = $this->bounds($request);
         if ($from->greaterThan($to) || $from->diffInDays($to) > 366) {
             return new JsonResponse(['error' => ['code' => 'invalid_period', 'message' => 'The report period is invalid.']], 422);
         }
@@ -47,6 +44,58 @@ final readonly class ReportsController
             ])->values()->all();
 
         return new JsonResponse(['data' => ['period' => ['from' => $from->toIso8601String(), 'to' => $to->toIso8601String(), 'timezone' => $timezone], 'totals' => $totals, 'topProducts' => $topProducts]]);
+    }
+
+    public function reconciliation(Request $request): JsonResponse
+    {
+        [$from, $to, $timezone] = $this->bounds($request);
+        if ($from->greaterThan($to) || $from->diffInDays($to) > 366) {
+            return new JsonResponse(['error' => ['code' => 'invalid_period', 'message' => 'The report period is invalid.']], 422);
+        }
+        $tenantId = (string) $this->context->id();
+        $lineTotals = DB::table('sale_lines')
+            ->where('tenant_id', $tenantId)
+            ->groupBy('sale_id')
+            ->select('sale_id')
+            ->selectRaw('COALESCE(SUM(gross_minor), 0) as line_gross_minor')
+            ->selectRaw('COALESCE(SUM(net_minor), 0) as line_net_minor')
+            ->selectRaw('COALESCE(SUM(tax_minor), 0) as line_tax_minor');
+        $rows = DB::table('sales')
+            ->leftJoinSub($lineTotals, 'line_totals', static fn ($join) => $join->on('line_totals.sale_id', '=', 'sales.id'))
+            ->where('sales.tenant_id', $tenantId)
+            ->where('sales.status', 'finalized')
+            ->whereBetween('sales.finalized_at', [$from, $to])
+            ->select('sales.id', 'sales.currency_code', 'sales.gross_minor', 'sales.net_minor', 'sales.tax_minor')
+            ->selectRaw('COALESCE(line_totals.line_gross_minor, 0) as line_gross_minor')
+            ->selectRaw('COALESCE(line_totals.line_net_minor, 0) as line_net_minor')
+            ->selectRaw('COALESCE(line_totals.line_tax_minor, 0) as line_tax_minor')
+            ->get();
+        $mismatches = $rows->filter(static fn (object $row): bool => (int) $row->gross_minor !== (int) $row->line_gross_minor
+            || (int) $row->net_minor !== (int) $row->line_net_minor
+            || (int) $row->tax_minor !== (int) $row->line_tax_minor)->take(100)->map(static fn (object $row): array => [
+                'saleId' => (string) $row->id,
+                'currencyCode' => (string) $row->currency_code,
+                'grossMinor' => ['sale' => (int) $row->gross_minor, 'lines' => (int) $row->line_gross_minor],
+                'netMinor' => ['sale' => (int) $row->net_minor, 'lines' => (int) $row->line_net_minor],
+                'taxMinor' => ['sale' => (int) $row->tax_minor, 'lines' => (int) $row->line_tax_minor],
+            ])->values()->all();
+
+        return new JsonResponse(['data' => [
+            'period' => ['from' => $from->toIso8601String(), 'to' => $to->toIso8601String(), 'timezone' => $timezone],
+            'checkedSales' => $rows->count(),
+            'status' => $mismatches === [] ? 'ok' : 'attention',
+            'mismatches' => $mismatches,
+        ]]);
+    }
+
+    /** @return array{0: CarbonImmutable, 1: CarbonImmutable, 2: string} */
+    private function bounds(Request $request): array
+    {
+        $timezone = $this->preferences->reportingTimezone();
+        $now = CarbonImmutable::now($timezone);
+        $from = $this->date($request->query('from'), $now->startOfMonth()->utc(), $timezone, false);
+        $to = $this->date($request->query('to'), $now->endOfDay()->utc(), $timezone, true);
+        return [$from, $to, $timezone];
     }
 
     private function date(mixed $value, CarbonImmutable $fallback, string $timezone, bool $endOfDay): CarbonImmutable

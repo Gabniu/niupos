@@ -40,4 +40,19 @@ final class ReportsTimezoneTest extends TestCase
             'timezone' => 'Africa/Nairobi',
         ], $response->getData(true)['data']['period']);
     }
+
+    public function test_reconciliation_is_explicitly_empty_when_no_finalized_sales_exist(): void
+    {
+        $tenant = Tenant::query()->create(['name' => 'Reconciliation tenant', 'jurisdiction_code' => 'KE', 'status' => 'active']);
+
+        $response = $this->app->make(TenantScope::class)->runFor((string) $tenant->getKey(), fn () => $this->app->make(ReportsController::class)->reconciliation(Request::create('/api/v1/reports/reconciliation', 'GET', [
+            'from' => '2026-08-01',
+            'to' => '2026-08-31',
+        ])));
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame('ok', $response->getData(true)['data']['status']);
+        self::assertSame(0, $response->getData(true)['data']['checkedSales']);
+        self::assertSame([], $response->getData(true)['data']['mismatches']);
+    }
 }
