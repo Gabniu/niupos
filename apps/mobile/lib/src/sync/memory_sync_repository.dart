@@ -11,6 +11,11 @@ final class MemorySyncRepository implements LocalSyncRepository {
   Future<int> cursor(SyncPartition partition) async => _state(partition).cursor;
 
   @override
+  Future<void> resetPartition(SyncPartition partition) async {
+    _partitions.remove(partition.key);
+  }
+
+  @override
   Future<void> enqueue(SyncPartition partition, OutboxCommand command) async {
     _checkVersion(command.version);
     final state = _state(partition);

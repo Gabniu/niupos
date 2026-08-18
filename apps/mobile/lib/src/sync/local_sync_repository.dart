@@ -3,6 +3,9 @@ import 'contracts.dart';
 abstract interface class LocalSyncRepository {
   Future<int> cursor(SyncPartition partition);
 
+  /// Clear only this tenant/device partition after verified local corruption.
+  Future<void> resetPartition(SyncPartition partition);
+
   Future<void> enqueue(SyncPartition partition, OutboxCommand command);
 
   Future<List<OutboxCommand>> pending(SyncPartition partition, {int limit = 50});
