@@ -32,13 +32,20 @@ the snapshot atomically, then pull changes after that cursor. The endpoint is
 rate-limited separately because it is larger and less frequent than a change
 page.
 
+For larger tenants the endpoint also supports bounded collection pages using
+`section`, `collection`, `after_id`, `limit`, and `snapshot_cursor`. The first
+page returns the authoritative cursor; continuation pages must echo it. If the
+cursor changes, the server rejects the transfer so the client can discard its
+staged pages and restart rather than mixing two catalogue states. The complete
+unpaged response remains available for small tenants and existing clients.
+
 ## Traceability and evidence
 
 - `TEST-G6-SYNC-BOOTSTRAP-001`: `SyncHttpTest` verifies middleware ordering and
   the frozen catalogue/pricing/cursor envelope; web adapter tests validate the
   same response shape and protocol version.
-- `RISK-G6-SYNC-BOOTSTRAP-001`: the snapshot is not yet a resumable multi-page
-  transfer; large tenants require bounded pagination before production rollout.
+- `RISK-G6-SYNC-BOOTSTRAP-001`: clients must stage all pages before replacing a
+  local projection; a cursor conflict requires a clean restart.
 
 ## Consequences
 

@@ -66,7 +66,20 @@
         "cursor": { "type": "integer", "minimum": 0 },
         "generatedAt": { "type": "string", "format": "date-time" },
         "catalogue": { "type": "object" },
-        "pricing": { "type": "object" }
+        "pricing": { "type": "object" },
+        "page": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["section", "collection", "afterId", "nextAfterId", "hasMore", "limit"],
+          "properties": {
+            "section": { "enum": ["catalogue", "pricing"] },
+            "collection": { "type": "string", "minLength": 1, "maxLength": 64 },
+            "afterId": { "type": ["string", "null"], "format": "uuid" },
+            "nextAfterId": { "type": ["string", "null"], "format": "uuid" },
+            "hasMore": { "type": "boolean" },
+            "limit": { "type": "integer", "minimum": 1, "maximum": 500 }
+          }
+        }
       }
     }
   }

@@ -59,6 +59,14 @@ export type SyncBootstrap = Readonly<{
   generatedAt: string;
   catalogue: Readonly<Record<string, unknown>>;
   pricing: Readonly<Record<string, unknown>>;
+  page?: Readonly<{
+    section: "catalogue" | "pricing";
+    collection: string;
+    afterId: string | null;
+    nextAfterId: string | null;
+    hasMore: boolean;
+    limit: number;
+  }>;
 }>;
 
 export function assertPartition(partition: SyncPartition): void {

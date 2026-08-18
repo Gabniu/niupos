@@ -48,7 +48,7 @@ final class SyncHttpTest extends TestCase
         [$tenant, , $token] = $this->identityFixture(['sync.use']);
         $device = fake()->uuid();
         $this->mock(SyncBootstrap::class, function (MockInterface $mock) use ($device): void {
-            $mock->shouldReceive('snapshot')->once()->with(strtolower($device))->andReturn([
+            $mock->shouldReceive('snapshot')->once()->with(strtolower($device), null)->andReturn([
                 'version' => '1', 'cursor' => 12, 'generatedAt' => '2026-08-08T10:00:00+03:00',
                 'catalogue' => ['categories' => [], 'unitsOfMeasure' => [], 'products' => [], 'variants' => [], 'barcodes' => []],
                 'pricing' => ['taxCategories' => [], 'priceBooks' => [], 'prices' => []],
@@ -57,6 +57,40 @@ final class SyncHttpTest extends TestCase
 
         $this->withToken($token)->withHeaders(['X-Tenant-ID' => $tenant, 'X-Device-Id' => $device])
             ->getJson('/api/v1/sync/bootstrap')->assertOk()->assertJsonPath('cursor', 12)->assertJsonPath('catalogue.products', []);
+    }
+
+    #[Test]
+    public function bootstrap_page_forwards_bounded_cursor_parameters_and_preserves_page_metadata(): void
+    {
+        [$tenant, , $token] = $this->identityFixture(['sync.use']);
+        $device = fake()->uuid();
+        $this->mock(SyncBootstrap::class, function (MockInterface $mock) use ($device): void {
+            $mock->shouldReceive('snapshot')->once()->with(strtolower($device), [
+                'section' => 'catalogue', 'collection' => 'products', 'after_id' => '01989f8e-1111-7111-8111-111111111111',
+                'limit' => 2, 'snapshot_cursor' => 12,
+            ])->andReturn([
+                'version' => '1', 'cursor' => 12, 'generatedAt' => '2026-08-08T10:00:00+03:00',
+                'catalogue' => ['categories' => [], 'unitsOfMeasure' => [], 'products' => [['id' => '01989f8e-2222-7222-8222-222222222222']], 'variants' => [], 'barcodes' => []],
+                'pricing' => ['taxCategories' => [], 'priceBooks' => [], 'prices' => []],
+                'page' => ['section' => 'catalogue', 'collection' => 'products', 'afterId' => '01989f8e-1111-7111-8111-111111111111', 'nextAfterId' => null, 'hasMore' => false, 'limit' => 2],
+            ]);
+        });
+
+        $this->withToken($token)->withHeaders(['X-Tenant-ID' => $tenant, 'X-Device-Id' => $device])
+            ->getJson('/api/v1/sync/bootstrap?section=catalogue&collection=products&after_id=01989f8e-1111-7111-8111-111111111111&limit=2&snapshot_cursor=12')
+            ->assertOk()->assertJsonPath('page.hasMore', false)->assertJsonPath('page.limit', 2);
+    }
+
+    #[Test]
+    public function bootstrap_rejects_unbounded_or_unknown_page_parameters(): void
+    {
+        [$tenant, , $token] = $this->identityFixture(['sync.use']);
+        $device = fake()->uuid();
+        $headers = ['X-Tenant-ID' => $tenant, 'X-Device-Id' => $device];
+        $this->withToken($token)->withHeaders($headers)->getJson('/api/v1/sync/bootstrap?section=catalogue&collection=products&limit=501')
+            ->assertUnprocessable()->assertJsonValidationErrors(['limit']);
+        $this->withToken($token)->withHeaders($headers)->getJson('/api/v1/sync/bootstrap?unknown=value')
+            ->assertUnprocessable()->assertJsonPath('error.code', 'SYNC_INVALID');
     }
 
     #[Test]

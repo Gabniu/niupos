@@ -23,14 +23,37 @@ final readonly class SyncController
 
     public function bootstrap(Request $request): JsonResponse
     {
+        $allowed = ['section', 'collection', 'after_id', 'limit', 'snapshot_cursor'];
+        if (array_diff(array_keys($request->query()), $allowed) !== []) {
+            return $this->failure(Response::HTTP_UNPROCESSABLE_ENTITY, 'SYNC_INVALID', 'The bootstrap request contains unsupported fields.');
+        }
+        $data = $request->validate([
+            'section' => ['sometimes', 'in:catalogue,pricing'],
+            'collection' => ['required_with:section', 'string', 'max:64'],
+            'after_id' => ['sometimes', 'uuid'],
+            'limit' => ['sometimes', 'integer', 'between:1,500'],
+            'snapshot_cursor' => ['sometimes', 'integer', 'min:0'],
+        ]);
+        if (isset($data['section']) && ! isset($data['collection'])) {
+            return $this->failure(Response::HTTP_UNPROCESSABLE_ENTITY, 'SYNC_INVALID', 'A bootstrap collection is required when paging.');
+        }
+        if ((isset($data['after_id']) || isset($data['limit']) || isset($data['snapshot_cursor'])) && ! isset($data['section'])) {
+            return $this->failure(Response::HTTP_UNPROCESSABLE_ENTITY, 'SYNC_INVALID', 'A bootstrap section is required when paging.');
+        }
+        $page = isset($data['section']) ? $data : null;
         $device = $this->deviceHeader($request);
         if ($device instanceof JsonResponse) {
             return $device;
         }
         try {
-            return new JsonResponse($this->bootstrap->snapshot($device));
+            return new JsonResponse($this->bootstrap->snapshot($device, $page));
         } catch (DomainException) {
             return $this->failure(Response::HTTP_NOT_FOUND, 'SYNC_DEVICE_UNAVAILABLE', 'The synchronization device is unavailable.');
+        } catch (RuntimeException $exception) {
+            if ($exception->getMessage() === 'SYNC_BOOTSTRAP_CHANGED') {
+                return $this->failure(Response::HTTP_CONFLICT, 'SYNC_BOOTSTRAP_CHANGED', 'The catalogue changed while it was being transferred. Restart the bootstrap.');
+            }
+            throw $exception;
         }
     }
 

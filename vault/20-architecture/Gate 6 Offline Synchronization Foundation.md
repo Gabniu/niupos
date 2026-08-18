@@ -23,6 +23,9 @@ adrs: [ADR-0031, ADR-0032, ADR-0033, ADR-0034, ADR-0035]
   tenant and device identity from admitted request context and bounded headers.
 - Authenticated `GET /api/v1/sync/bootstrap` returns active catalogue, effective
   pricing, and the current tenant cursor for atomic local initialization.
+- Bootstrap also supports bounded, collection-level pages with a cursor echo;
+  a changed server cursor fails the transfer so clients restart from a clean
+  staged snapshot instead of mixing catalogue states.
 - Catalogue product/variant/barcode and pricing tax/book/price creation append
   tenant-scoped `upsert` changes in the same database transaction.
 - Product, price-book, and tax-category deactivation propagates inactive
@@ -47,7 +50,8 @@ adrs: [ADR-0031, ADR-0032, ADR-0033, ADR-0034, ADR-0035]
 
 - Laravel integrated suite: 138 tests, 794 assertions.
 - MOD-SYNC focused suite: 9 tests, 42 assertions.
-- Web offline suite: 17 tests; ESLint and Next.js production build pass.
+- Web offline suite: 18 tests; ESLint and TypeScript checks pass. The Next.js
+  build remains the final local web check after this contract addition.
 - Repository architecture and shared-contract checks: 7 tests pass.
 - Mobile source and tests exist, but Dart/Flutter execution is pending because the
   SDK is not installed in the current environment.
@@ -56,8 +60,8 @@ adrs: [ADR-0031, ADR-0032, ADR-0033, ADR-0034, ADR-0035]
 
 Gate 6 remains **in progress**. The server now executes one `sales.finalize.v1`
 command through the existing Sales application contract; unsupported commands
-remain explicit rejections. Catalogue/pricing field updates and hard deletes and
-bootstrap pagination/large-tenant transfer, persistent encrypted mobile storage,
+remain explicit rejections. Catalogue/pricing field updates and hard deletes,
+persistent encrypted mobile storage,
 behavior, corrupt-state recovery, clock-skew/prolonged-partition tests, and an
 the real authenticated server/client reconnect scenario must pass before the
 gate can close. Coordinator-level reconnect behavior is now covered; remaining

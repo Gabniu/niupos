@@ -7,5 +7,6 @@ namespace App\Modules\Sync\Application\Contracts;
 interface SyncBootstrap
 {
     /** @return array<string, mixed> */
-    public function snapshot(string $devicePublicId): array;
+    /** @param array{section:string,collection:string,after_id?:string,limit?:int,snapshot_cursor?:int}|null $page */
+    public function snapshot(string $devicePublicId, ?array $page = null): array;
 }

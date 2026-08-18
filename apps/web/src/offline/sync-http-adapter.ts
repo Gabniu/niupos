@@ -23,6 +23,14 @@ export type SyncHttpAdapterOptions = Readonly<{
   deviceHeader?: string;
 }>;
 
+export type SyncBootstrapPageRequest = Readonly<{
+  section: "catalogue" | "pricing";
+  collection: string;
+  afterId?: string;
+  limit?: number;
+  snapshotCursor?: number;
+}>;
+
 export class SyncTransportError extends Error {
   readonly code: "network" | "http" | "invalid_response";
   readonly retryable: boolean;
@@ -91,10 +99,19 @@ export function parseChangePage(value: unknown, currentCursor: number): ChangeBa
 }
 
 export function parseBootstrap(value: unknown): SyncBootstrap {
-  if (!object(value) || !exactKeys(value, ["version", "cursor", "generatedAt", "catalogue", "pricing"]) ||
+  if (!object(value) || !exactKeys(value, ["version", "cursor", "generatedAt", "catalogue", "pricing"], ["page"]) ||
       value.version !== SYNC_PROTOCOL_VERSION || !Number.isSafeInteger(value.cursor) || Number(value.cursor) < 0 ||
       !timestamp(value.generatedAt) || !object(value.catalogue) || !object(value.pricing)) {
     throw new SyncTransportError("Bootstrap shape or protocol version is invalid", "invalid_response", false);
+  }
+  if (value.page !== undefined) {
+    if (!object(value.page) || !exactKeys(value.page, ["section", "collection", "afterId", "nextAfterId", "hasMore", "limit"]) ||
+        !["catalogue", "pricing"].includes(String(value.page.section)) || !nonempty(value.page.collection, 64) ||
+        (value.page.afterId !== null && !uuid(value.page.afterId)) ||
+        (value.page.nextAfterId !== null && !uuid(value.page.nextAfterId)) || typeof value.page.hasMore !== "boolean" ||
+        !Number.isSafeInteger(value.page.limit) || Number(value.page.limit) < 1 || Number(value.page.limit) > 500) {
+      throw new SyncTransportError("Bootstrap page metadata is invalid", "invalid_response", false);
+    }
   }
   return value as SyncBootstrap;
 }
@@ -159,8 +176,20 @@ export class SyncHttpAdapter {
     return parseChangePage(value, cursor);
   }
 
-  async bootstrap(partition: SyncPartition): Promise<SyncBootstrap> {
-    const value = await this.#request(`${this.#baseUrl}${this.#bootstrapPath}`, {
+  async bootstrap(partition: SyncPartition, page?: SyncBootstrapPageRequest): Promise<SyncBootstrap> {
+    const query = new URLSearchParams();
+    if (page) {
+      if (!page.section || !page.collection.trim()) throw new Error("Bootstrap page section and collection are required");
+      if (page.limit !== undefined && (!Number.isSafeInteger(page.limit) || page.limit < 1 || page.limit > 500)) throw new Error("Bootstrap page limit is invalid");
+      if (page.snapshotCursor !== undefined && (!Number.isSafeInteger(page.snapshotCursor) || page.snapshotCursor < 0)) throw new Error("Bootstrap snapshot cursor is invalid");
+      query.set("section", page.section);
+      query.set("collection", page.collection);
+      if (page.afterId) query.set("after_id", page.afterId);
+      if (page.limit !== undefined) query.set("limit", String(page.limit));
+      if (page.snapshotCursor !== undefined) query.set("snapshot_cursor", String(page.snapshotCursor));
+    }
+    const suffix = query.toString() ? `?${query}` : "";
+    const value = await this.#request(`${this.#baseUrl}${this.#bootstrapPath}${suffix}`, {
       method: "GET",
       headers: await this.#headers(partition),
     });

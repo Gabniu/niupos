@@ -63,6 +63,26 @@ test("bootstrap validates the catalogue and pricing snapshot envelope", async ()
   assert.throws(() => parseBootstrap({ version: "2", cursor: 0, generatedAt: "2026-08-08T10:00:00Z", catalogue: {}, pricing: {} }), /invalid/);
 });
 
+test("bootstrap pages encode bounded transfer parameters and validate metadata", async () => {
+  let url = "";
+  const adapter = new SyncHttpAdapter({
+    baseUrl: "https://api.example.test",
+    authHeaders: () => ({}),
+    fetch: async (input) => {
+      url = String(input);
+      return Response.json({
+        version: "1", cursor: 8, generatedAt: "2026-08-08T10:00:00Z",
+        catalogue: { products: [{ id: "11111111-1111-4111-8111-111111111111" }] }, pricing: {},
+        page: { section: "catalogue", collection: "products", afterId: null, nextAfterId: null, hasMore: false, limit: 2 },
+      });
+    },
+  });
+  const page = await adapter.bootstrap(partition, { section: "catalogue", collection: "products", limit: 2, snapshotCursor: 8 });
+  assert.equal(page.page?.hasMore, false);
+  assert.match(url, /section=catalogue&collection=products&limit=2&snapshot_cursor=8$/);
+  assert.throws(() => parseBootstrap({ version: "1", cursor: 0, generatedAt: "2026-08-08T10:00:00Z", catalogue: {}, pricing: {}, page: { section: "catalogue", collection: "products", afterId: null, nextAfterId: null, hasMore: false, limit: 501 } }), /metadata/);
+});
+
 test("network, overload, and invalid protocol failures have stable classifications", async () => {
   const make = (fetch: FetchLike) =>
     new SyncHttpAdapter({ baseUrl: "https://api.example.test", authHeaders: () => ({}), fetch });
