@@ -47,20 +47,20 @@ admin rails are viewport-bounded so only the content region scrolls.
 - [x] Verify real password-recovery email delivery through the configured
   Resend provider. The production request was accepted and the administrator
   confirmed receipt without exposing the reset URL.
-- [ ] Complete reset-link consumption and sign-in with the new password in a
-  disposable/recovery test account; never record the reset URL.
+- [x] Complete reset-link consumption and sign-in with the new password in a
+  disposable/recovery test account; no reset URL or password was recorded.
 
 Resend support is implemented behind the typed `delivery.provider` setting and
 the `delivery.resendApiKey` secret reference. The deployed Auth container now
 uses the `resend` provider and reads its key from Infisical; the verified sender
-is configured server-side. Recovery delivery is verified; reset-link
-consumption remains open until the operator completes it.
+is configured server-side. Recovery delivery, reset-link consumption, and
+sign-in are verified; no reset URL or password is retained.
 
 Google upstream sign-in is implemented but disabled by default. It requires
 server-side `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` plus the exact
 production callback documented in `README.md`; the control-plane UI stores only
-the secret reference. Recovery delivery is verified; reset-link consumption
-remains open until the operator completes the final step.
+the secret reference. Recovery delivery and reset-link consumption are
+verified; no reset URL or password is retained.
 
 ## Self-hosted secret manager rollout
 
