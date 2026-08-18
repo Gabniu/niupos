@@ -37,17 +37,19 @@ reader was placed behind a Suspense boundary. Auth lint, TypeScript, tests
   enable/verification/disable, an audited admin setting write, and a temporary
   confidential OAuth client through authorization → consent → token → userinfo
   against the deployed Auth image. All temporary state is removed after the run.
-- [ ] Complete a real password-recovery E2E after a secure mail provider/webhook
-  is configured. Until then delivery intentionally fails closed and no recovery
-  link is issued.
+- [x] Verify real password-recovery email delivery through the configured
+  Resend provider. The production request was accepted and the administrator
+  confirmed receipt without exposing the reset URL.
+- [ ] Complete reset-link consumption and sign-in with the new password in a
+  disposable/recovery test account; never record the reset URL.
 
 Resend delivery support now reads `AUTH_RESEND_API_KEY` through the private
 Infisical production path `/niu-auth` using the least-privilege
 `niu-auth-production` machine identity. The authenticated read and Auth
 container health check passed after correcting the project ID; the environment
-fallback remains available for rollback. A real password-recovery delivery
-assertion remains open; no raw API key belongs in this note or the control-plane
-database.
+fallback remains available for rollback. Recovery delivery is verified;
+reset-link consumption remains open until the operator completes the final
+step. No raw API key belongs in this note or the control-plane database.
 
 Google upstream sign-in is implemented but remains disabled by default. To offer
 customers a Google button without exposing Google credentials to consuming apps,

@@ -44,21 +44,23 @@ admin rails are viewport-bounded so only the content region scrolls.
   `/oauth2/token` → `/oauth2/userinfo` against the deployed Auth image. The
   temporary database, client, user, tokens, and network are removed after each
   run.
-- [ ] Complete a real password-recovery E2E after a secure mail provider/webhook
-  is configured. Until then delivery intentionally fails closed and no recovery
-  link is issued.
+- [x] Verify real password-recovery email delivery through the configured
+  Resend provider. The production request was accepted and the administrator
+  confirmed receipt without exposing the reset URL.
+- [ ] Complete reset-link consumption and sign-in with the new password in a
+  disposable/recovery test account; never record the reset URL.
 
 Resend support is implemented behind the typed `delivery.provider` setting and
 the `delivery.resendApiKey` secret reference. The deployed Auth container now
 uses the `resend` provider and reads its key from Infisical; the verified sender
-is configured server-side. A real password-recovery delivery assertion is
-still open.
+is configured server-side. Recovery delivery is verified; reset-link
+consumption remains open until the operator completes it.
 
 Google upstream sign-in is implemented but disabled by default. It requires
 server-side `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` plus the exact
 production callback documented in `README.md`; the control-plane UI stores only
-the secret reference. Password recovery remains open until a real mail
-transport is configured and exercised end to end.
+the secret reference. Recovery delivery is verified; reset-link consumption
+remains open until the operator completes the final step.
 
 ## Self-hosted secret manager rollout
 
