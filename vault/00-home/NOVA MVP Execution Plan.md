@@ -188,6 +188,9 @@ ownership or tenant admission rules.
 
 ## Current completion estimate
 
+Revised implementation band (2026-08-18): approximately 58-65% of the full
+operational MVP. This is a planning estimate, not a release-readiness claim.
+
 Approximately 52–60% of the full operational MVP is implemented. Batch 6 now has
 a frozen shared sync contract, durable server protocol and authenticated transport,
 an executable `sales.finalize.v1` adapter, complete catalogue/pricing mutation
