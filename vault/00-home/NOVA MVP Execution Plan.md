@@ -143,7 +143,9 @@ and current-month request bounds. Tenant reporting timezone configuration now
 drives date-only report bounds and is returned with the period metadata. A
 read-only sale-to-line reconciliation endpoint now reports explicit drift
 evidence. Payment allocation reconciliation evidence is now available through
-the reports boundary. Batch 7 remains open: fiscal integration and external
+the reports boundary, and a provider-neutral tenant fiscal submission queue
+now preserves replay-safe offline intent. Batch 7 remains open: verified
+OSCU/VSCU adapter certification, fiscal sandbox evidence, and external
 search-provider evidence.
 A provider-neutral tenant search projection/rebuild boundary now exists, and
 its rebuild source reads active catalogue products, variants, and barcodes from

@@ -4,6 +4,7 @@ use App\Modules\Audit\AuditServiceProvider;
 use App\Modules\Catalogue\CatalogueServiceProvider;
 use App\Modules\Channels\ChannelsServiceProvider;
 use App\Modules\Identity\IdentityServiceProvider;
+use App\Modules\Fiscal\FiscalServiceProvider;
 use App\Modules\Inventory\InventoryServiceProvider;
 use App\Modules\Onboarding\OnboardingServiceProvider;
 use App\Modules\Payments\PaymentsServiceProvider;
@@ -23,6 +24,7 @@ return [
     TenancyServiceProvider::class,
     AuditServiceProvider::class,
     IdentityServiceProvider::class,
+    FiscalServiceProvider::class,
     InventoryServiceProvider::class,
     OnboardingServiceProvider::class,
     PaymentsServiceProvider::class,
