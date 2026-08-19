@@ -6,6 +6,7 @@ namespace Tests\Feature\Modules\Payments;
 
 use App\Modules\Identity\Domain\User;
 use App\Modules\Payments\Application\Contracts\PaymentProcessor;
+use App\Modules\Payments\Application\Contracts\PaymentReconciliationReader;
 use App\Modules\Payments\Application\Contracts\PaymentSettlementReader;
 use App\Modules\Payments\Application\Contracts\SalePaymentLookup;
 use App\Modules\Payments\Application\Data\PayableSale;
@@ -48,6 +49,7 @@ final class PaymentProcessorTest extends TestCase
             self::assertSame('succeeded', $first->status);
             self::assertSame(1, PaymentAttempt::query()->count());
             self::assertSame(11600, PaymentAllocation::query()->sum('amount_minor'));
+            self::assertSame(11600, $this->app->make(PaymentReconciliationReader::class)->totalsForSales([$fixture['sale']])[0]->allocatedMinor);
             self::assertTrue($this->app->make(PaymentSettlementReader::class)->isFullyPaid($fixture['sale'], 'KES', 11600));
         });
     }

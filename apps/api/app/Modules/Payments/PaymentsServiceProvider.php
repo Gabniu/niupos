@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Modules\Payments;
 
 use App\Modules\Payments\Application\Contracts\PaymentProcessor;
+use App\Modules\Payments\Application\Contracts\PaymentReconciliationReader;
 use App\Modules\Payments\Application\Contracts\PaymentSettlementReader;
+use App\Modules\Payments\Application\DatabasePaymentReconciliationReader;
 use App\Modules\Payments\Application\DatabasePaymentProcessor;
 use App\Modules\Payments\Application\DatabasePaymentSettlementReader;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -18,6 +20,7 @@ final class PaymentsServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->scoped(PaymentProcessor::class, DatabasePaymentProcessor::class);
+        $this->app->scoped(PaymentReconciliationReader::class, DatabasePaymentReconciliationReader::class);
         $this->app->scoped(PaymentSettlementReader::class, DatabasePaymentSettlementReader::class);
     }
 

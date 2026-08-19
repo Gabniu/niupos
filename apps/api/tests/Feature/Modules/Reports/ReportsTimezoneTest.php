@@ -55,4 +55,20 @@ final class ReportsTimezoneTest extends TestCase
         self::assertSame(0, $response->getData(true)['data']['checkedSales']);
         self::assertSame([], $response->getData(true)['data']['mismatches']);
     }
+
+    public function test_payment_reconciliation_is_explicitly_empty_when_no_finalized_sales_exist(): void
+    {
+        $tenant = Tenant::query()->create(['name' => 'Payment reconciliation tenant', 'jurisdiction_code' => 'KE', 'status' => 'active']);
+
+        $response = $this->app->make(TenantScope::class)->runFor((string) $tenant->getKey(), fn () => $this->app->make(ReportsController::class)->paymentReconciliation(Request::create('/api/v1/reports/payment-reconciliation', 'GET', [
+            'from' => '2026-08-01',
+            'to' => '2026-08-31',
+        ])));
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame('ok', $response->getData(true)['data']['status']);
+        self::assertSame(0, $response->getData(true)['data']['checkedSales']);
+        self::assertSame(0, $response->getData(true)['data']['fullyPaidSales']);
+        self::assertSame([], $response->getData(true)['data']['mismatches']);
+    }
 }

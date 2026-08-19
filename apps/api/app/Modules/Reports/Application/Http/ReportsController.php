@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Reports\Application\Http;
 
+use App\Modules\Payments\Application\Contracts\PaymentReconciliationReader;
 use App\Modules\Tenancy\Application\TenantContext;
 use App\Modules\Tenancy\Application\Contracts\WorkspacePreferencesReader;
 use Carbon\CarbonImmutable;
@@ -13,7 +14,7 @@ use Illuminate\Support\Facades\DB;
 
 final readonly class ReportsController
 {
-    public function __construct(private TenantContext $context, private WorkspacePreferencesReader $preferences) {}
+    public function __construct(private TenantContext $context, private WorkspacePreferencesReader $preferences, private PaymentReconciliationReader $payments) {}
 
     public function summary(Request $request): JsonResponse
     {
@@ -83,6 +84,49 @@ final readonly class ReportsController
         return new JsonResponse(['data' => [
             'period' => ['from' => $from->toIso8601String(), 'to' => $to->toIso8601String(), 'timezone' => $timezone],
             'checkedSales' => $rows->count(),
+            'status' => $mismatches === [] ? 'ok' : 'attention',
+            'mismatches' => $mismatches,
+        ]]);
+    }
+
+    public function paymentReconciliation(Request $request): JsonResponse
+    {
+        [$from, $to, $timezone] = $this->bounds($request);
+        if ($from->greaterThan($to) || $from->diffInDays($to) > 366) {
+            return new JsonResponse(['error' => ['code' => 'invalid_period', 'message' => 'The report period is invalid.']], 422);
+        }
+        $sales = DB::table('sales')
+            ->where('tenant_id', (string) $this->context->id())
+            ->where('status', 'finalized')
+            ->whereBetween('finalized_at', [$from, $to])
+            ->select('id', 'currency_code', 'gross_minor')
+            ->orderBy('id')
+            ->get();
+        $totals = $this->payments->totalsForSales($sales->pluck('id')->map(static fn (mixed $id): string => (string) $id)->all());
+        $allocated = [];
+        foreach ($totals as $total) {
+            $allocated[$total->saleId.'|'.$total->currencyCode] = $total->allocatedMinor;
+        }
+        $rows = $sales->map(function (object $sale) use ($allocated): array {
+            $gross = (int) $sale->gross_minor;
+            $paid = (int) ($allocated[(string) $sale->id.'|'.(string) $sale->currency_code] ?? 0);
+            $difference = $paid - $gross;
+
+            return [
+                'saleId' => (string) $sale->id,
+                'currencyCode' => (string) $sale->currency_code,
+                'grossMinor' => $gross,
+                'allocatedMinor' => $paid,
+                'differenceMinor' => $difference,
+                'status' => $difference === 0 ? 'ok' : ($difference < 0 ? 'underpaid' : 'overpaid'),
+            ];
+        });
+        $mismatches = $rows->filter(static fn (array $row): bool => $row['status'] !== 'ok')->take(100)->values()->all();
+
+        return new JsonResponse(['data' => [
+            'period' => ['from' => $from->toIso8601String(), 'to' => $to->toIso8601String(), 'timezone' => $timezone],
+            'checkedSales' => $rows->count(),
+            'fullyPaidSales' => $rows->where('status', 'ok')->count(),
             'status' => $mismatches === [] ? 'ok' : 'attention',
             'mismatches' => $mismatches,
         ]]);
