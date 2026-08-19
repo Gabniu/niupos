@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Modules\Reports\Application\Http;
 
+use App\Modules\Fiscal\Application\Contracts\FiscalSubmissionReader;
 use App\Modules\Payments\Application\Contracts\PaymentReconciliationReader;
 use App\Modules\Tenancy\Application\TenantContext;
 use App\Modules\Tenancy\Application\Contracts\WorkspacePreferencesReader;
@@ -14,7 +15,7 @@ use Illuminate\Support\Facades\DB;
 
 final readonly class ReportsController
 {
-    public function __construct(private TenantContext $context, private WorkspacePreferencesReader $preferences, private PaymentReconciliationReader $payments) {}
+    public function __construct(private TenantContext $context, private WorkspacePreferencesReader $preferences, private PaymentReconciliationReader $payments, private FiscalSubmissionReader $fiscal) {}
 
     public function summary(Request $request): JsonResponse
     {
@@ -129,6 +130,18 @@ final readonly class ReportsController
             'fullyPaidSales' => $rows->where('status', 'ok')->count(),
             'status' => $mismatches === [] ? 'ok' : 'attention',
             'mismatches' => $mismatches,
+        ]]);
+    }
+
+    public function fiscalSubmissions(): JsonResponse
+    {
+        $summary = $this->fiscal->summary();
+
+        return new JsonResponse(['data' => [
+            'counts' => $summary->counts,
+            'total' => $summary->total,
+            'oldestPendingAt' => $summary->oldestPendingAt,
+            'nextRetryAt' => $summary->nextRetryAt,
         ]]);
     }
 

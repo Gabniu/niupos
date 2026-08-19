@@ -71,4 +71,17 @@ final class ReportsTimezoneTest extends TestCase
         self::assertSame(0, $response->getData(true)['data']['fullyPaidSales']);
         self::assertSame([], $response->getData(true)['data']['mismatches']);
     }
+
+    public function test_fiscal_submission_status_is_explicitly_empty_for_a_new_tenant(): void
+    {
+        $tenant = Tenant::query()->create(['name' => 'Fiscal status tenant', 'jurisdiction_code' => 'KE', 'status' => 'active']);
+
+        $response = $this->app->make(TenantScope::class)->runFor((string) $tenant->getKey(), fn () => $this->app->make(ReportsController::class)->fiscalSubmissions());
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame(['queued' => 0, 'sending' => 0, 'submitted' => 0, 'rejected' => 0, 'retry_pending' => 0], $response->getData(true)['data']['counts']);
+        self::assertSame(0, $response->getData(true)['data']['total']);
+        self::assertNull($response->getData(true)['data']['oldestPendingAt']);
+        self::assertNull($response->getData(true)['data']['nextRetryAt']);
+    }
 }

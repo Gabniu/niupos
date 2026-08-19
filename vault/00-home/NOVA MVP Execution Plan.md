@@ -144,8 +144,9 @@ drives date-only report bounds and is returned with the period metadata. A
 read-only sale-to-line reconciliation endpoint now reports explicit drift
 evidence. Payment allocation reconciliation evidence is now available through
 the reports boundary, and a provider-neutral tenant fiscal submission queue
-now preserves replay-safe offline intent and a bounded processor/gateway
-boundary for later verified submission. Search also has an optional
+now preserves replay-safe offline intent, a bounded processor/gateway
+boundary for later verified submission, and an aggregate queue status view.
+Search also has an optional
 Elasticsearch adapter with versioned alias cutover, and catalogue lookup uses
 it only for ordering authoritative PostgreSQL rows. Batch 7 remains open:
 verified OSCU/VSCU adapter certification, fiscal sandbox evidence, and real
