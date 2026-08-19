@@ -1,11 +1,3 @@
-/** Compact ten-dot product mark shared by the auth and admin shells. */
-export function Brand({ inverse = false, label = "NIU IDENTITY" }: { inverse?: boolean; label?: string }) {
-  return (
-    <span className={`inline-flex items-center gap-3 font-semibold tracking-[-0.02em] ${inverse ? "text-white" : "text-slate-950"}`}>
-      <span aria-hidden="true" className={`grid size-10 shrink-0 grid-cols-3 auto-rows-[4px] place-content-center gap-1 rounded-full border ${inverse ? "border-white/70" : "border-slate-400/80"}`}>
-        {Array.from({ length: 10 }, (_, index) => <i className={`size-1 rounded-full ${inverse ? "bg-white" : "bg-slate-700"} ${index === 9 ? "col-start-2" : ""}`} key={index} />)}
-      </span>
-      <span className="text-lg" style={{ fontFamily: "var(--font-hanken)" }}>{label}</span>
-    </span>
-  );
+export function Brand({ inverse = false }: { inverse?: boolean }) {
+  return <span className={`inline-flex items-center gap-2 font-medium tracking-[0.01em] ${inverse ? "text-white" : "text-slate-950"}`}><span aria-hidden="true" className={`grid size-6.5 place-items-center rounded-full border not-italic shadow-sm ${inverse ? "border-emerald-200/70 bg-emerald-400/55 text-white" : "border-emerald-400/70 bg-emerald-400/55 text-white"}`}><svg className="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d="M7 10V8a5 5 0 0 1 10 0v2M6 10h12v10H6zM12 14v2" /></svg></span><span className="text-base" style={{ fontFamily: "var(--font-hanken)" }}>NIU <span className={inverse ? "text-emerald-300" : "text-emerald-600"}>IDENTITY</span></span></span>;
 }
