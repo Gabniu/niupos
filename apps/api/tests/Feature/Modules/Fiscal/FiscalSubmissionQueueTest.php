@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace Tests\Feature\Modules\Fiscal;
 
 use App\Modules\Fiscal\Application\Contracts\FiscalSubmissionQueue;
+use App\Modules\Fiscal\Application\Contracts\FiscalGateway;
+use App\Modules\Fiscal\Application\DatabaseFiscalSubmissionProcessor;
 use App\Modules\Fiscal\Application\Data\FiscalInvoice;
+use App\Modules\Fiscal\Application\Data\FiscalGatewayResult;
 use App\Modules\Fiscal\FiscalServiceProvider;
 use App\Modules\Identity\Domain\User;
 use App\Modules\Register\Domain\Register;
@@ -60,6 +63,26 @@ final class FiscalSubmissionQueueTest extends TestCase
             $queue->enqueue($first);
             $this->expectException(RuntimeException::class);
             $queue->enqueue($conflict);
+        });
+    }
+
+    public function test_due_submission_is_claimed_and_recorded_from_a_provider_result(): void
+    {
+        $fixture = $this->saleFixture('fiscal-process');
+        $invoice = new FiscalInvoice($fixture['sale'], 'ke.etims', 'KES', 1000, 160, 1160, 'fiscal-process', ['invoiceNumber' => 'local-process']);
+        $this->inTenant($fixture['tenant'], function (FiscalSubmissionQueue $queue) use ($invoice): void {
+            $queue->enqueue($invoice);
+            $gateway = new class implements FiscalGateway
+            {
+                public function submit(FiscalInvoice $invoice): FiscalGatewayResult
+                {
+                    return new FiscalGatewayResult('submitted', 'KRA-REFERENCE-1', 'accepted');
+                }
+            };
+            $processor = new DatabaseFiscalSubmissionProcessor($this->app->make(\App\Modules\Tenancy\Application\TenantContext::class), $gateway);
+            self::assertSame(1, $processor->processDue());
+            self::assertSame('submitted', $queue->findForSale($invoice->saleId)?->status);
+            self::assertSame('KRA-REFERENCE-1', $queue->findForSale($invoice->saleId)?->providerReference);
         });
     }
 
