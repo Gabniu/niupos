@@ -4,14 +4,16 @@ declare(strict_types=1);
 
 namespace App\Modules\Catalogue\Application\Http;
 
+use App\Modules\Search\Application\Contracts\SearchProjection;
 use App\Modules\Tenancy\Application\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 final readonly class ProductController
 {
-    public function __construct(private TenantContext $context) {}
+    public function __construct(private TenantContext $context, private SearchProjection $searchProjection) {}
 
     public function index(Request $request): JsonResponse
     {
@@ -36,6 +38,8 @@ final readonly class ProductController
             ->limit(100)
             ->get(['variants.id', 'products.name as product_name', 'variants.name as variant_name', 'variants.sku', 'units.code as unit_code']);
 
+        $rows = $this->orderWithProjection($rows, $search);
+
         return new JsonResponse(['data' => $rows->map(static fn (object $row): array => [
             'id' => (string) $row->id,
             'name' => (string) $row->product_name,
@@ -43,5 +47,30 @@ final readonly class ProductController
             'sku' => (string) $row->sku,
             'unitCode' => $row->unit_code === null ? null : (string) $row->unit_code,
         ])->values()->all()]);
+    }
+
+    /** @param Collection<int, object> $rows @return Collection<int, object> */
+    private function orderWithProjection(Collection $rows, string $search): Collection
+    {
+        if ($search === '' || config('search.driver') !== 'elasticsearch') {
+            return $rows;
+        }
+
+        try {
+            $ids = collect($this->searchProjection->search($search, 100))
+                ->filter(static fn ($document): bool => $document->documentType === 'catalogue.product_variant')
+                ->map(static fn ($document): string => $document->documentId)
+                ->values();
+            if ($ids->isEmpty()) {
+                return $rows;
+            }
+            $byId = $rows->keyBy(static fn (object $row): string => (string) $row->id);
+            $ordered = $ids->map(static fn (string $id): ?object => $byId->get($id))->filter();
+            $seen = $ordered->keyBy(static fn (object $row): string => (string) $row->id);
+
+            return $ordered->concat($rows->reject(static fn (object $row): bool => $seen->has((string) $row->id)))->values();
+        } catch (\Throwable) {
+            return $rows;
+        }
     }
 }
